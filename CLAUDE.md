@@ -60,8 +60,9 @@ totem, o KDS da cozinha, o painel do dono e o painel de chamada de senha.
 > mudar junto.
 
 > \*\*REGRA 4 — Datas no fuso do estabelecimento, não em UTC.\*\*
-> `(now() at time zone fuso)::date`. A senha do dia zera às 21h se usar
-> `current\_date` puro — no meio do movimento da hamburgueria.
+> `(now() at time zone fuso)::date`. Em UTC, "hoje" vira "amanhã" às 21h —
+> no meio do movimento da hamburgueria. Hoje isso decide se um número de
+> plaquinha ainda está bloqueado, e vai decidir todo relatório por dia.
 
 > \*\*REGRA 5 — Imagem é redimensionada no navegador antes do upload.\*\*
 > Máx. 800px, convertida para WebP (\~60 KB). Foto de celular tem 4 MB;
@@ -112,15 +113,21 @@ Só depois disso comece a Edge Function.
 `aceita\_pedidos` (dono pausa o totem), `fuso`, `config` jsonb
 * `perfis` — liga `auth.users` a um estabelecimento. Papéis:
 `superadmin` (Isaac), `dono`, `cozinha`
-* `mesas` — numeradas por estabelecimento
+* `mesas` — os números de plaquinha válidos. Serve para barrar erro de digitação
+(mesa 99 numa loja com 40 plaquinhas)
 * `categorias`, `produtos` — cardápio. `produtos.disponivel` = botão "esgotou"
 * `grupos\_opcoes` + `opcoes` + `produto\_grupos` — personalização **reutilizável**.
 Tipos: `adicional` (soma preço), `remocao` (sem cebola), `escolha` (ponto da carne).
 Um grupo serve vários produtos: mudar o preço do bacon = editar 1 linha
 * `combo\_slots` + `combo\_slot\_produtos` — combo é produto que contém produtos.
 Mecanismo diferente de adicional, não confunda
-* `pedidos`, `pedido\_itens`, `pedido\_item\_opcoes` — com snapshots
-* `contadores\_senha` + função `proxima\_senha(uuid)` — sequencial diário por fuso
+* `pedidos`, `pedido\_itens`, `pedido\_item\_opcoes` — com snapshots.
+`pedidos.mesa\_numero` = a plaquinha digitada, é a identificação do pedido.
+`pedidos.alerta\_reuso\_em` = alguém tentou usar esse número enquanto o pedido
+estava aberto; o KDS destaca para a equipe confirmar a entrega
+* `contadores\_senha` + `proxima\_senha(uuid)` — **SEM USO.** Ficaram para o caso
+de um cliente futuro preferir senha sequencial em vez de plaquinha. `pedidos.senha`
+fica nulo
 
 **Funções auxiliares de RLS:** `meu\_estabelecimento()`, `sou\_superadmin()`
 
@@ -138,13 +145,13 @@ decide o caminho a partir do token dele.
 
 Não construa nada fora desta lista. O piloto precisa ir ao ar.
 
-1. **Totem** (`/:slug`) — informa mesa → categorias → produto → personalização
-→ carrinho → confirma → mostra senha
-2. **Edge Function `criar-pedido`** — valida, recalcula total, gera senha
+1. **Totem** (`/:slug`) — categorias → produto → personalização → carrinho
+→ digita o número da plaquinha → confirma
+2. **Edge Function `criar-pedido`** — valida, recalcula total ✅ *pronta*
 3. **KDS** (`/:slug/cozinha`) — pedidos em tempo real, botão "pronto".
 Número da mesa em destaque, maior que o nome do produto
 4. **Painel do dono** (`/:slug/admin`) — esgotar/reativar item, mudar preço
-5. **Pagamento: no caixa.** O totem só emite senha
+5. **Pagamento: no caixa.** O cliente fala o número da mesa no caixa
 
 **Fora de escopo agora:** Pix, maquininha, relatórios, NFC-e, cadastro de
 cardápio pelo dono (Isaac cadastra no onboarding).
@@ -153,12 +160,17 @@ cardápio pelo dono (Isaac cadastra no onboarding).
 
 ## Fluxo do totem (piloto: garçom leva na mesa)
 
+**O número do pedido é uma plaquinha física** que fica ao lado do totem. O
+cliente pega uma, deixa na mesa e digita o número **no fim** do pedido. O sistema
+não gera número sequencial — assim as plaquinhas voltam para a pilha em qualquer
+ordem e o dono não precisa organizar nada no fim do dia.
+
 1. Tela inicial com a logo → "Toque para pedir"
-2. **Número da mesa**, teclado grande (mesas são numeradas fisicamente)
-3. Categorias → produtos com foto e preço
-4. Produto → grupos de opções (obrigatórios primeiro) → adicionar
-5. Carrinho → revisar → **confirmar mesa** ("Mesa 7, está certo?")
-6. "Pedido enviado. Senha 23. Pague no caixa."
+2. Categorias → produtos com foto e preço
+3. Produto → grupos de opções (obrigatórios primeiro) → adicionar
+4. Carrinho → revisar
+5. **Número da mesa**, teclado grande → **confirmar** ("Mesa 17, está certo?")
+6. "Pedido enviado. Mesa 17. Pague no caixa."
 7. Volta sozinho para a tela inicial após 15s
 
 **Design:** alvos de toque grandes (mínimo 60px), fonte grande, contraste alto.
@@ -172,6 +184,10 @@ tipo desktop.
 * **Queda de internet** — estado de erro claro, nunca aceitar pedido e perder
 * **Cliente desiste no meio** — timeout de inatividade limpa o carrinho
 * **Mesa errada** — confirmação explícita antes de enviar
+* **Número de plaquinha repetido** — recusa o pedido, manda pegar outra plaquinha
+e marca `alerta\_reuso\_em` no pedido antigo para o KDS destacar. Só bloqueia se o
+pedido aberto for **de hoje**: se a equipe esquecer de marcar entrega, os números
+não podem ir sumindo até o totem travar
 * **Totem caiu** — heartbeat, Isaac precisa saber antes do dono ligar
 
 \---

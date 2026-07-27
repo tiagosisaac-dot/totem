@@ -8,10 +8,13 @@
 // O totem manda apenas ESCOLHAS (ids). Se mandar um campo
 // "total", "preco" ou parecido, e simplesmente ignorado.
 //
+// O numero da mesa e a plaquinha que o cliente pegou ao lado do totem
+// e digitou no fim do pedido. O sistema NAO gera numero sequencial.
+//
 // Entrada esperada (POST, JSON):
 // {
 //   "slug": "adoravelburguer",
-//   "mesa_numero": 7,
+//   "mesa_numero": 17,
 //   "observacao": "sem pressa",              // opcional
 //   "itens": [
 //     {
@@ -26,7 +29,7 @@
 //   ]
 // }
 //
-// Saida: { "pedido_id": "uuid", "senha": 23, "total": "48.50", "mesa_numero": 7 }
+// Saida: { "pedido_id": "uuid", "mesa_numero": 17, "total": "48.50" }
 // ============================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -171,7 +174,7 @@ Deno.serve(async (req) => {
     // ========================================================
     const { data: estab, error: erroEstab } = await sb
       .from('estabelecimentos')
-      .select('id, nome, ativo, bloqueado, mensagem_bloqueio, aceita_pedidos, config')
+      .select('id, nome, ativo, bloqueado, mensagem_bloqueio, aceita_pedidos, fuso')
       .eq('slug', slug)
       .maybeSingle()
 
@@ -185,30 +188,69 @@ Deno.serve(async (req) => {
     }
 
     // ========================================================
-    // 3. MESA
-    // Confere contra a tabela mesas para nao aceitar numero digitado errado.
+    // 3. NUMERO DA MESA (a plaquinha que o cliente pegou)
+    //
+    // E a identificacao do pedido: fica na mesa para o garcom achar,
+    // e e o que o cliente fala no caixa. Por isso e obrigatorio.
     // ========================================================
-    const config = (estab.config ?? {}) as Record<string, unknown>
-    const exigeMesa = config.exige_mesa !== false // padrao: exige
-    let mesaNumero: number | null = null
-
-    if (corpo.mesa_numero !== undefined && corpo.mesa_numero !== null) {
-      const n = Number(corpo.mesa_numero)
-      if (!Number.isInteger(n) || n < 1) throw new ErroPedido('Número de mesa inválido.')
-
-      const { data: mesa, error: erroMesa } = await sb
-        .from('mesas')
-        .select('numero')
-        .eq('estabelecimento_id', estab.id)
-        .eq('numero', n)
-        .eq('ativa', true)
-        .maybeSingle()
-
-      if (erroMesa) throw erroMesa
-      if (!mesa) throw new ErroPedido(`Mesa ${n} não existe. Confira o número.`)
-      mesaNumero = n
-    } else if (exigeMesa) {
+    const mesaNumero = Number(corpo.mesa_numero)
+    if (!Number.isInteger(mesaNumero) || mesaNumero < 1) {
       throw new ErroPedido('Informe o número da mesa.')
+    }
+
+    // barra erro de digitacao: mesa 99 numa loja com 40 plaquinhas
+    const { data: mesa, error: erroMesa } = await sb
+      .from('mesas')
+      .select('numero')
+      .eq('estabelecimento_id', estab.id)
+      .eq('numero', mesaNumero)
+      .eq('ativa', true)
+      .maybeSingle()
+
+    if (erroMesa) throw erroMesa
+    if (!mesa) throw new ErroPedido(`Mesa ${mesaNumero} não existe. Confira o número.`)
+
+    // ---- esse numero ja esta em outro pedido em aberto? ----
+    const { data: emAberto, error: erroAberto } = await sb
+      .from('pedidos')
+      .select('id, criado_em')
+      .eq('estabelecimento_id', estab.id)
+      .eq('mesa_numero', mesaNumero)
+      .in('status', ['aguardando_pagamento', 'em_producao', 'pronto'])
+
+    if (erroAberto) throw erroAberto
+
+    // REGRA 4: o dia e o do fuso do estabelecimento, nao UTC.
+    // So pedido aberto DE HOJE bloqueia o numero. Se a equipe esqueceu
+    // de marcar entrega ontem, a plaquinha volta a funcionar hoje —
+    // senao os numeros iriam sumindo um a um ate o totem travar.
+    const diaLocal = (quando: Date) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: estab.fuso,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(quando)
+
+    const hoje = diaLocal(new Date())
+    const conflitos = (emAberto ?? []).filter((p) => diaLocal(new Date(p.criado_em)) === hoje)
+
+    if (conflitos.length > 0) {
+      // marca o pedido antigo para o KDS destacar: a equipe precisa
+      // confirmar a entrega para liberar o numero
+      await sb
+        .from('pedidos')
+        .update({ alerta_reuso_em: new Date().toISOString() })
+        .in(
+          'id',
+          conflitos.map((p) => p.id),
+        )
+
+      throw new ErroPedido(
+        `A mesa ${mesaNumero} já está em uso por outro pedido. ` +
+          `Pegue outra plaquinha e tente novamente.`,
+        409,
+      )
     }
 
     // ========================================================
@@ -437,15 +479,10 @@ Deno.serve(async (req) => {
     }
 
     // ========================================================
-    // 6. SENHA DO DIA (no fuso do estabelecimento — REGRA 4)
-    // ========================================================
-    const { data: senha, error: erroSenha } = await sb.rpc('proxima_senha', {
-      p_estabelecimento: estab.id,
-    })
-    if (erroSenha) throw erroSenha
-
-    // ========================================================
-    // 7. GRAVAR
+    // 6. GRAVAR
+    //
+    // Sem chamar proxima_senha: o numero do pedido e a plaquinha que
+    // o cliente digitou. A coluna 'senha' fica vazia de proposito.
     // Se qualquer parte falhar, apaga o pedido inteiro: melhor
     // "tente de novo" que meio pedido na cozinha.
     // ========================================================
@@ -453,14 +490,13 @@ Deno.serve(async (req) => {
       .from('pedidos')
       .insert({
         estabelecimento_id: estab.id,
-        senha,
         mesa_numero: mesaNumero,
         total: paraReais(totalCentavos), // calculado AQUI, nunca recebido
         forma_pagamento: 'caixa',
         observacao: texto(corpo.observacao),
         origem: 'totem',
       })
-      .select('id, senha')
+      .select('id, mesa_numero')
       .single()
 
     if (erroPedido) throw erroPedido
@@ -514,9 +550,8 @@ Deno.serve(async (req) => {
 
     return resposta({
       pedido_id: pedido.id,
-      senha: pedido.senha,
+      mesa_numero: pedido.mesa_numero,
       total: paraReais(totalCentavos),
-      mesa_numero: mesaNumero,
     })
   } catch (e) {
     // desfaz pedido pela metade

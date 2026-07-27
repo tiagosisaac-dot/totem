@@ -105,7 +105,8 @@ Escopo fechado. O piloto precisa ir ao ar; nada fora desta lista entra agora.
 
 * **Cliente:** Adorável Burguer (`adoravelburguer`)
 * **Operação:** cliente pede no totem, paga no caixa, **garçom leva o pedido à mesa**
-* **Mesas:** 40, numeradas fisicamente
+* **Plaquinhas:** 40 numeradas, ao lado do totem
+  * **A DEFINIR:** quem produz as plaquinhas e quanto custa
 * **Quantos tablets:** **A DEFINIR**
 * **Data de início:** **A DEFINIR**
 * **Duração antes de decidir se vira produto:** **A DEFINIR**
@@ -125,13 +126,38 @@ Sugestões de medida, escolher poucas:
 
 ## 8. Fluxo do cliente no totem
 
+### A plaquinha é o número do pedido
+
+Ao lado do totem fica uma pilha de plaquinhas numeradas. O cliente pega uma,
+deixa na mesa onde vai sentar e digita esse número **no fim** do pedido. O garçom
+encontra a mesa procurando a plaquinha; no caixa, o cliente fala esse número.
+
+**O sistema não gera número sequencial.** Isso é deliberado: como o cliente pega
+qualquer plaquinha, elas voltam para a pilha em qualquer ordem, e ninguém precisa
+reorganizá-las no fim do dia. Coerente com a proposta do produto — o sistema tira
+trabalho do dono, não adiciona.
+
+### Fluxo
+
 1. Tela inicial com a logo → "Toque para pedir"
-2. **Número da mesa**, em teclado grande
-3. Categorias → produtos com foto e preço
-4. Produto → opções (obrigatórias primeiro) → adicionar ao carrinho
-5. Carrinho → revisar → **confirmar mesa** ("Mesa 7, está certo?")
-6. "Pedido enviado. Senha 23. Pague no caixa."
+2. Categorias → produtos com foto e preço
+3. Produto → opções (obrigatórias primeiro) → adicionar ao carrinho
+4. Carrinho → revisar
+5. **Número da mesa** em teclado grande → confirmar ("Mesa 17, está certo?")
+6. "Pedido enviado. Mesa 17. Pague no caixa."
 7. Volta sozinho para a tela inicial após 15 segundos
+
+### Número já em uso
+
+Se o cliente digitar um número que está em outro pedido ainda aberto, o pedido é
+**recusado** e a tela pede para pegar outra plaquinha. No mesmo momento, o pedido
+antigo é destacado no painel da cozinha, para a equipe lembrar de confirmar a
+entrega e liberar o número.
+
+**Limite importante:** só bloqueia se o pedido aberto for de **hoje**. Se a equipe
+esquecer de marcar entregas, os números iriam sendo bloqueados um a um até o totem
+recusar todo mundo — e um pedido esquecido ontem travaria aquela plaquinha para
+sempre.
 
 **Diretrizes de tela:** alvo de toque mínimo 60px, fonte grande, contraste alto.
 É usado em pé, com pressa, por gente de todas as idades. Nada de menu discreto
@@ -149,7 +175,7 @@ prejuízo real.
 | **Nada de dado de estabelecimento no código** | Cada cliente novo exigiria um deploy. O modelo SaaS deixa de funcionar |
 | **O total nunca é calculado no tablet** | Qualquer pessoa no wi-fi da loja manda pedido de R$ 0,00 |
 | **Pedido guarda cópia do nome e do preço** | Dono muda o preço amanhã e a venda de ontem muda junto. Histórico financeiro não pode ser reescrito |
-| **Data no fuso do estabelecimento** | A senha do dia zera às 21h, no meio do movimento |
+| **Data no fuso do estabelecimento** | Em UTC, "hoje" vira "amanhã" às 21h, no meio do movimento. Isso decide se uma plaquinha ainda está bloqueada e vai decidir todo relatório por dia |
 | **Imagem redimensionada antes de subir** | Foto de celular tem 4 MB. 40 delas travam o tablet no wi-fi da loja |
 | **Toda tabela nasce com sua regra de acesso** | Consulta volta vazia sem erro e ninguém entende por quê |
 
@@ -161,7 +187,9 @@ prejuízo real.
 |---|---|
 | Queda de internet | Erro claro na tela. Nunca aceitar pedido que não foi gravado |
 | Cliente desiste no meio | Timeout de inatividade limpa o carrinho e volta ao início |
-| Mesa digitada errada | Confirmação explícita antes de enviar + a mesa é validada contra as mesas cadastradas |
+| Mesa digitada errada | Confirmação explícita antes de enviar + o número é validado contra as plaquinhas cadastradas |
+| Plaquinha em uso por outro pedido | Recusa, pede outra plaquinha e destaca o pedido antigo na cozinha. Só considera pedidos de hoje, para não travar a loja |
+| Equipe não marca pedidos como entregues | O destaque na cozinha é o empurrão. O limite de "hoje" impede que o problema acumule para o dia seguinte |
 | Totem travado / offline | Heartbeat. Isaac precisa saber antes do dono ligar |
 | Item esgotado no meio do movimento | Botão "esgotou" no painel do dono, e o servidor recusa pedido de item indisponível |
 | Dono pede coisa fora de escopo durante o piloto | Este documento |
@@ -188,10 +216,11 @@ prejuízo real.
 * Banco criado com todas as tabelas, isolamento entre estabelecimentos
   **testado na prática** (tentativa de gravar na pasta de outra loja foi barrada)
 * Armazenamento de imagens configurado
-* Edge Function `criar-pedido` publicada e testada com 7 casos, incluindo
-  tentativa de fraude enviando total zerado — o servidor devolveu o valor real
+* Edge Function `criar-pedido` publicada e testada, incluindo tentativa de fraude
+  enviando total zerado — o servidor devolveu o valor real
+* Recusa de número de plaquinha em uso, com aviso para a cozinha, testada
 * Projeto React criado
-* 40 mesas e um cardápio de teste cadastrados
+* 40 números de plaquinha e um cardápio de teste cadastrados
 
 **Próximo:** telas do totem.
 
