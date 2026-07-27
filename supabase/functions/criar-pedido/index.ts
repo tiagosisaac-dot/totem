@@ -1,0 +1,535 @@
+// ============================================================
+// EDGE FUNCTION: criar-pedido
+//
+// Roda NO SERVIDOR. E a peca que garante a REGRA 2:
+// o total nunca vem do navegador — e sempre recalculado aqui,
+// buscando os precos reais no banco.
+//
+// O totem manda apenas ESCOLHAS (ids). Se mandar um campo
+// "total", "preco" ou parecido, e simplesmente ignorado.
+//
+// Entrada esperada (POST, JSON):
+// {
+//   "slug": "adoravelburguer",
+//   "mesa_numero": 7,
+//   "observacao": "sem pressa",              // opcional
+//   "itens": [
+//     {
+//       "produto_id": "uuid",
+//       "quantidade": 2,
+//       "observacao": "bem passado",          // opcional
+//       "opcoes": ["uuid-opcao", "uuid-opcao"],           // opcional
+//       "combo_escolhas": [                                // so em combos
+//         { "slot_id": "uuid", "produto_id": "uuid" }
+//       ]
+//     }
+//   ]
+// }
+//
+// Saida: { "pedido_id": "uuid", "senha": 23, "total": "48.50", "mesa_numero": 7 }
+// ============================================================
+
+import { createClient } from 'npm:@supabase/supabase-js@2'
+
+// ------------------------------------------------------------
+// Limites de sanidade: barram pedido absurdo antes de tocar o banco
+// ------------------------------------------------------------
+const MAX_ITENS = 50
+const MAX_QUANTIDADE = 99
+const MAX_OPCOES_POR_ITEM = 30
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+// ------------------------------------------------------------
+// Dinheiro em CENTAVOS (numero inteiro).
+// Somar 0.1 + 0.2 em ponto flutuante da 0.30000000000000004.
+// Em centavos isso nao acontece.
+// ------------------------------------------------------------
+const paraCentavos = (valor: unknown) => Math.round(Number(valor ?? 0) * 100)
+const paraReais = (centavos: number) => (centavos / 100).toFixed(2)
+
+function resposta(corpo: unknown, status = 200) {
+  return new Response(JSON.stringify(corpo), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  })
+}
+
+// Erro que o totem sabe mostrar para o cliente
+class ErroPedido extends Error {
+  status: number
+  constructor(mensagem: string, status = 400) {
+    super(mensagem)
+    this.status = status
+  }
+}
+
+type ComboEscolha = { slot_id: string; produto_id: string }
+type ItemEntrada = {
+  produto_id: string
+  quantidade?: number
+  observacao?: string | null
+  opcoes?: string[]
+  combo_escolhas?: ComboEscolha[]
+}
+
+const ehUuid = (v: unknown) =>
+  typeof v === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+
+const texto = (v: unknown, max = 280) =>
+  typeof v === 'string' && v.trim() !== '' ? v.trim().slice(0, max) : null
+
+Deno.serve(async (req) => {
+  // O navegador manda um OPTIONS antes do POST para perguntar
+  // "posso chamar essa URL?". Isso responde essa pergunta.
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+  if (req.method !== 'POST') return resposta({ erro: 'Use POST.' }, 405)
+
+  // service_role: chave de administrador do banco. So existe aqui dentro,
+  // NUNCA no frontend. E ela que permite gravar em pedidos (o anon nao pode).
+  const sb = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    { auth: { persistSession: false } },
+  )
+
+  let pedidoCriadoId: string | null = null
+
+  try {
+    // ========================================================
+    // 1. LER E CONFERIR O FORMATO DA ENTRADA
+    // ========================================================
+    let corpo: Record<string, unknown>
+    try {
+      corpo = await req.json()
+    } catch {
+      throw new ErroPedido('Corpo da requisição não é um JSON válido.')
+    }
+
+    const slug = texto(corpo.slug, 60)
+    if (!slug) throw new ErroPedido('Informe o slug do estabelecimento.')
+
+    const itensEntrada = corpo.itens
+    if (!Array.isArray(itensEntrada) || itensEntrada.length === 0) {
+      throw new ErroPedido('O pedido está vazio.')
+    }
+    if (itensEntrada.length > MAX_ITENS) {
+      throw new ErroPedido(`Pedido com itens demais (máximo ${MAX_ITENS}).`)
+    }
+
+    const itens: ItemEntrada[] = itensEntrada.map((bruto, i) => {
+      const linha = i + 1
+      if (typeof bruto !== 'object' || bruto === null) {
+        throw new ErroPedido(`Item ${linha} inválido.`)
+      }
+      const item = bruto as Record<string, unknown>
+
+      if (!ehUuid(item.produto_id)) {
+        throw new ErroPedido(`Item ${linha}: produto inválido.`)
+      }
+
+      const quantidade = item.quantidade === undefined ? 1 : Number(item.quantidade)
+      if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > MAX_QUANTIDADE) {
+        throw new ErroPedido(`Item ${linha}: quantidade deve ser de 1 a ${MAX_QUANTIDADE}.`)
+      }
+
+      const opcoes = item.opcoes === undefined ? [] : item.opcoes
+      if (!Array.isArray(opcoes) || opcoes.length > MAX_OPCOES_POR_ITEM || !opcoes.every(ehUuid)) {
+        throw new ErroPedido(`Item ${linha}: lista de opções inválida.`)
+      }
+
+      const escolhasBrutas = item.combo_escolhas === undefined ? [] : item.combo_escolhas
+      if (!Array.isArray(escolhasBrutas)) {
+        throw new ErroPedido(`Item ${linha}: escolhas do combo inválidas.`)
+      }
+      const combo_escolhas: ComboEscolha[] = escolhasBrutas.map((e) => {
+        const esc = e as Record<string, unknown>
+        if (!ehUuid(esc?.slot_id) || !ehUuid(esc?.produto_id)) {
+          throw new ErroPedido(`Item ${linha}: escolha de combo inválida.`)
+        }
+        return { slot_id: esc.slot_id as string, produto_id: esc.produto_id as string }
+      })
+
+      return {
+        produto_id: item.produto_id as string,
+        quantidade,
+        observacao: texto(item.observacao),
+        // ids repetidos viram um so: pedir "bacon" duas vezes no mesmo
+        // grupo nao deve cobrar dobrado
+        opcoes: [...new Set(opcoes as string[])],
+        combo_escolhas,
+      }
+    })
+
+    // ========================================================
+    // 2. ESTABELECIMENTO: existe? esta vendendo?
+    // ========================================================
+    const { data: estab, error: erroEstab } = await sb
+      .from('estabelecimentos')
+      .select('id, nome, ativo, bloqueado, mensagem_bloqueio, aceita_pedidos, config')
+      .eq('slug', slug)
+      .maybeSingle()
+
+    if (erroEstab) throw erroEstab
+    if (!estab) throw new ErroPedido('Estabelecimento não encontrado.', 404)
+    if (!estab.ativo || estab.bloqueado) {
+      throw new ErroPedido(estab.mensagem_bloqueio ?? 'Sistema temporariamente indisponível.', 403)
+    }
+    if (!estab.aceita_pedidos) {
+      throw new ErroPedido('Não estamos aceitando pedidos neste momento.', 409)
+    }
+
+    // ========================================================
+    // 3. MESA
+    // Confere contra a tabela mesas para nao aceitar numero digitado errado.
+    // ========================================================
+    const config = (estab.config ?? {}) as Record<string, unknown>
+    const exigeMesa = config.exige_mesa !== false // padrao: exige
+    let mesaNumero: number | null = null
+
+    if (corpo.mesa_numero !== undefined && corpo.mesa_numero !== null) {
+      const n = Number(corpo.mesa_numero)
+      if (!Number.isInteger(n) || n < 1) throw new ErroPedido('Número de mesa inválido.')
+
+      const { data: mesa, error: erroMesa } = await sb
+        .from('mesas')
+        .select('numero')
+        .eq('estabelecimento_id', estab.id)
+        .eq('numero', n)
+        .eq('ativa', true)
+        .maybeSingle()
+
+      if (erroMesa) throw erroMesa
+      if (!mesa) throw new ErroPedido(`Mesa ${n} não existe. Confira o número.`)
+      mesaNumero = n
+    } else if (exigeMesa) {
+      throw new ErroPedido('Informe o número da mesa.')
+    }
+
+    // ========================================================
+    // 4. BUSCAR NO BANCO TUDO QUE FOI PEDIDO
+    //    (produtos do carrinho + produtos escolhidos dentro de combos)
+    // ========================================================
+    const idsProdutosTopo = [...new Set(itens.map((i) => i.produto_id))]
+    const idsProdutosCombo = [
+      ...new Set(itens.flatMap((i) => i.combo_escolhas!.map((e) => e.produto_id))),
+    ]
+    const idsProdutos = [...new Set([...idsProdutosTopo, ...idsProdutosCombo])]
+
+    // eq(estabelecimento_id) e o que impede pedir produto de OUTRA loja
+    const { data: produtos, error: erroProd } = await sb
+      .from('produtos')
+      .select('id, nome, preco, tipo, disponivel, vendavel_sozinho')
+      .eq('estabelecimento_id', estab.id)
+      .in('id', idsProdutos)
+
+    if (erroProd) throw erroProd
+    const mapaProdutos = new Map((produtos ?? []).map((p) => [p.id, p]))
+
+    // Grupos de opcoes ligados a cada produto (para saber o que e permitido
+    // e o que e obrigatorio)
+    const { data: vinculos, error: erroVinc } = await sb
+      .from('produto_grupos')
+      .select(
+        'produto_id, grupo_id, grupos_opcoes!inner(id, nome, min_selecao, max_selecao, ativo, estabelecimento_id)',
+      )
+      .in('produto_id', idsProdutosTopo)
+
+    if (erroVinc) throw erroVinc
+
+    type Grupo = {
+      id: string
+      nome: string
+      min_selecao: number
+      max_selecao: number | null
+      ativo: boolean
+      estabelecimento_id: string
+    }
+    // produto -> grupos permitidos
+    const gruposDoProduto = new Map<string, Grupo[]>()
+    for (const v of vinculos ?? []) {
+      const g = v.grupos_opcoes as unknown as Grupo
+      if (!g?.ativo || g.estabelecimento_id !== estab.id) continue
+      const lista = gruposDoProduto.get(v.produto_id) ?? []
+      lista.push(g)
+      gruposDoProduto.set(v.produto_id, lista)
+    }
+
+    // Opcoes escolhidas
+    const idsOpcoes = [...new Set(itens.flatMap((i) => i.opcoes!))]
+    const mapaOpcoes = new Map<
+      string,
+      { id: string; grupo_id: string; nome: string; preco_adicional: number; disponivel: boolean }
+    >()
+    if (idsOpcoes.length > 0) {
+      const { data: opcoes, error: erroOp } = await sb
+        .from('opcoes')
+        .select('id, grupo_id, nome, preco_adicional, disponivel')
+        .in('id', idsOpcoes)
+      if (erroOp) throw erroOp
+      for (const o of opcoes ?? []) mapaOpcoes.set(o.id, o)
+    }
+
+    // Slots de combo (so dos produtos que sao combo)
+    const idsCombos = idsProdutosTopo.filter((id) => mapaProdutos.get(id)?.tipo === 'combo')
+    type Slot = {
+      id: string
+      combo_id: string
+      nome: string
+      min_selecao: number
+      max_selecao: number
+      combo_slot_produtos: { produto_id: string; preco_adicional: number }[]
+    }
+    const slotsDoCombo = new Map<string, Slot[]>()
+    if (idsCombos.length > 0) {
+      const { data: slots, error: erroSlot } = await sb
+        .from('combo_slots')
+        .select('id, combo_id, nome, min_selecao, max_selecao, combo_slot_produtos(produto_id, preco_adicional)')
+        .in('combo_id', idsCombos)
+      if (erroSlot) throw erroSlot
+      for (const s of (slots ?? []) as unknown as Slot[]) {
+        const lista = slotsDoCombo.get(s.combo_id) ?? []
+        lista.push(s)
+        slotsDoCombo.set(s.combo_id, lista)
+      }
+    }
+
+    // ========================================================
+    // 5. VALIDAR E RECALCULAR — o coracao da Regra 2
+    // ========================================================
+    type LinhaOpcao = { opcao_id: string; nome_snap: string; preco_snap: string }
+    type LinhaFilho = { produto_id: string; nome_snap: string; preco_snap: string }
+    type LinhaItem = {
+      produto_id: string
+      nome_snap: string
+      preco_snap: string
+      quantidade: number
+      subtotal: string
+      observacao: string | null
+      opcoes: LinhaOpcao[]
+      filhos: LinhaFilho[]
+    }
+
+    const linhas: LinhaItem[] = []
+    let totalCentavos = 0
+
+    for (let i = 0; i < itens.length; i++) {
+      const item = itens[i]
+      const produto = mapaProdutos.get(item.produto_id)
+      const rotulo = `Item ${i + 1}`
+
+      if (!produto) throw new ErroPedido(`${rotulo}: produto não encontrado no cardápio.`)
+      if (!produto.disponivel) throw new ErroPedido(`${produto.nome} está esgotado.`, 409)
+      if (!produto.vendavel_sozinho) {
+        throw new ErroPedido(`${produto.nome} só pode ser pedido dentro de um combo.`)
+      }
+
+      let extrasCentavos = 0
+
+      // ---- 5a. Opcoes (adicionais, remocoes, escolhas) ----
+      const permitidos = gruposDoProduto.get(produto.id) ?? []
+      const idsPermitidos = new Set(permitidos.map((g) => g.id))
+      const escolhidasPorGrupo = new Map<string, number>()
+      const linhasOpcoes: LinhaOpcao[] = []
+
+      for (const idOpcao of item.opcoes!) {
+        const opcao = mapaOpcoes.get(idOpcao)
+        if (!opcao) throw new ErroPedido(`${rotulo}: opção não encontrada.`)
+        // impede pedir "sem cebola" num refrigerante
+        if (!idsPermitidos.has(opcao.grupo_id)) {
+          throw new ErroPedido(`${rotulo}: "${opcao.nome}" não é uma opção de ${produto.nome}.`)
+        }
+        if (!opcao.disponivel) throw new ErroPedido(`${opcao.nome} está esgotado.`, 409)
+
+        escolhidasPorGrupo.set(opcao.grupo_id, (escolhidasPorGrupo.get(opcao.grupo_id) ?? 0) + 1)
+        extrasCentavos += paraCentavos(opcao.preco_adicional)
+        linhasOpcoes.push({
+          opcao_id: opcao.id,
+          nome_snap: opcao.nome,
+          preco_snap: paraReais(paraCentavos(opcao.preco_adicional)),
+        })
+      }
+
+      // minimo e maximo de cada grupo (inclusive grupos onde nada foi escolhido)
+      for (const grupo of permitidos) {
+        const quantas = escolhidasPorGrupo.get(grupo.id) ?? 0
+        if (quantas < grupo.min_selecao) {
+          throw new ErroPedido(
+            `${produto.nome}: escolha ${grupo.min_selecao} opção(ões) em "${grupo.nome}".`,
+          )
+        }
+        if (grupo.max_selecao !== null && quantas > grupo.max_selecao) {
+          throw new ErroPedido(
+            `${produto.nome}: no máximo ${grupo.max_selecao} opção(ões) em "${grupo.nome}".`,
+          )
+        }
+      }
+
+      // ---- 5b. Combo (mecanismo diferente de adicional) ----
+      const linhasFilhos: LinhaFilho[] = []
+
+      if (produto.tipo === 'combo') {
+        const slots = slotsDoCombo.get(produto.id) ?? []
+        const idsSlotsValidos = new Set(slots.map((s) => s.id))
+
+        for (const escolha of item.combo_escolhas!) {
+          if (!idsSlotsValidos.has(escolha.slot_id)) {
+            throw new ErroPedido(`${rotulo}: escolha não pertence a ${produto.nome}.`)
+          }
+        }
+
+        for (const slot of slots) {
+          const escolhas = item.combo_escolhas!.filter((e) => e.slot_id === slot.id)
+          if (escolhas.length < slot.min_selecao) {
+            throw new ErroPedido(`${produto.nome}: escolha em "${slot.nome}".`)
+          }
+          if (escolhas.length > slot.max_selecao) {
+            throw new ErroPedido(
+              `${produto.nome}: no máximo ${slot.max_selecao} em "${slot.nome}".`,
+            )
+          }
+
+          for (const escolha of escolhas) {
+            const permitido = slot.combo_slot_produtos.find(
+              (p) => p.produto_id === escolha.produto_id,
+            )
+            if (!permitido) {
+              throw new ErroPedido(`${produto.nome}: opção inválida em "${slot.nome}".`)
+            }
+            const filho = mapaProdutos.get(escolha.produto_id)
+            if (!filho) throw new ErroPedido(`${rotulo}: produto do combo não encontrado.`)
+            if (!filho.disponivel) throw new ErroPedido(`${filho.nome} está esgotado.`, 409)
+
+            // dentro do combo cobra-se apenas o upgrade, nao o preco cheio
+            const upgrade = paraCentavos(permitido.preco_adicional)
+            extrasCentavos += upgrade
+            linhasFilhos.push({
+              produto_id: filho.id,
+              nome_snap: filho.nome,
+              preco_snap: paraReais(upgrade),
+            })
+          }
+        }
+      } else if (item.combo_escolhas!.length > 0) {
+        throw new ErroPedido(`${produto.nome} não é um combo.`)
+      }
+
+      // ---- 5c. Conta final do item ----
+      const precoBase = paraCentavos(produto.preco)
+      const subtotal = (precoBase + extrasCentavos) * item.quantidade
+      totalCentavos += subtotal
+
+      linhas.push({
+        produto_id: produto.id,
+        nome_snap: produto.nome, // REGRA 3: copia. Nunca JOIN no historico.
+        preco_snap: paraReais(precoBase),
+        quantidade: item.quantidade!,
+        subtotal: paraReais(subtotal),
+        observacao: item.observacao ?? null,
+        opcoes: linhasOpcoes,
+        filhos: linhasFilhos,
+      })
+    }
+
+    // ========================================================
+    // 6. SENHA DO DIA (no fuso do estabelecimento — REGRA 4)
+    // ========================================================
+    const { data: senha, error: erroSenha } = await sb.rpc('proxima_senha', {
+      p_estabelecimento: estab.id,
+    })
+    if (erroSenha) throw erroSenha
+
+    // ========================================================
+    // 7. GRAVAR
+    // Se qualquer parte falhar, apaga o pedido inteiro: melhor
+    // "tente de novo" que meio pedido na cozinha.
+    // ========================================================
+    const { data: pedido, error: erroPedido } = await sb
+      .from('pedidos')
+      .insert({
+        estabelecimento_id: estab.id,
+        senha,
+        mesa_numero: mesaNumero,
+        total: paraReais(totalCentavos), // calculado AQUI, nunca recebido
+        forma_pagamento: 'caixa',
+        observacao: texto(corpo.observacao),
+        origem: 'totem',
+      })
+      .select('id, senha')
+      .single()
+
+    if (erroPedido) throw erroPedido
+    pedidoCriadoId = pedido.id
+
+    for (const linha of linhas) {
+      const { data: itemGravado, error: erroItem } = await sb
+        .from('pedido_itens')
+        .insert({
+          pedido_id: pedido.id,
+          produto_id: linha.produto_id,
+          nome_snap: linha.nome_snap,
+          preco_snap: linha.preco_snap,
+          quantidade: linha.quantidade,
+          subtotal: linha.subtotal,
+          observacao: linha.observacao,
+        })
+        .select('id')
+        .single()
+
+      if (erroItem) throw erroItem
+
+      if (linha.opcoes.length > 0) {
+        const { error: erroOpcoes } = await sb.from('pedido_item_opcoes').insert(
+          linha.opcoes.map((o) => ({
+            pedido_item_id: itemGravado.id,
+            opcao_id: o.opcao_id,
+            nome_snap: o.nome_snap,
+            preco_snap: o.preco_snap,
+          })),
+        )
+        if (erroOpcoes) throw erroOpcoes
+      }
+
+      // produtos escolhidos dentro do combo apontam para a linha do combo
+      if (linha.filhos.length > 0) {
+        const { error: erroFilhos } = await sb.from('pedido_itens').insert(
+          linha.filhos.map((f) => ({
+            pedido_id: pedido.id,
+            produto_id: f.produto_id,
+            nome_snap: f.nome_snap,
+            preco_snap: f.preco_snap,
+            quantidade: 1,
+            subtotal: '0.00', // ja contabilizado no subtotal do combo
+            combo_pai_id: itemGravado.id,
+          })),
+        )
+        if (erroFilhos) throw erroFilhos
+      }
+    }
+
+    return resposta({
+      pedido_id: pedido.id,
+      senha: pedido.senha,
+      total: paraReais(totalCentavos),
+      mesa_numero: mesaNumero,
+    })
+  } catch (e) {
+    // desfaz pedido pela metade
+    if (pedidoCriadoId) {
+      await sb.from('pedidos').delete().eq('id', pedidoCriadoId)
+    }
+
+    if (e instanceof ErroPedido) {
+      return resposta({ erro: e.message }, e.status)
+    }
+
+    // erro inesperado: detalhe fica no log, cliente ve mensagem generica
+    console.error('criar-pedido falhou:', e)
+    return resposta({ erro: 'Não foi possível enviar o pedido. Tente novamente.' }, 500)
+  }
+})
