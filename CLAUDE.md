@@ -198,6 +198,14 @@ não podem ir sumindo até o totem travar
 * Dois ambientes Supabase: `dev` e `prod`. Nunca mexer direto em produção
 * Commit pequeno e frequente, mensagem em português
 * Sem `service\_role key` no frontend, jamais. Só em Edge Function
+* **Rodar o projeto:** `npm --prefix app run dev` → `http://localhost:5173/adoravelburguer`
+* **Publicar Edge Function:** `npx --yes supabase@latest functions deploy <nome>
+--project-ref mpcrwhaqrismnhblgvij`. Não precisa de `supabase link` nem de Docker
+(o aviso de Docker no deploy é irrelevante)
+* **`npm audit` acusa falha alta no `react-router`** — é no modo RSC, que roda
+roteamento no servidor. O totem é 100% navegador, esse código nem carrega. Não
+existe versão corrigida; a única "correção" oferecida é voltar para uma versão
+antiga. Não voltar. Reavaliar quando sair release com o patch
 
 \---
 

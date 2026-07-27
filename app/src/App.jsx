@@ -1,9 +1,46 @@
-function App() {
+// ============================================================
+// ENDERECOS DO SISTEMA
+//
+// Um codigo so serve os quatro destinos. O que muda e o endereco:
+//   /adoravelburguer          -> totem do salao
+//   /adoravelburguer/cozinha  -> KDS da cozinha
+//   /adoravelburguer/admin    -> painel do dono
+//
+// O 'slug' na frente e o que identifica de qual estabelecimento a
+// tela esta falando. Nenhum nome de loja aparece aqui (REGRA 1).
+// ============================================================
+
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Totem from './paginas/Totem.jsx'
+
+export default function App() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <h1 className="text-4xl font-bold">Totem funcionando ✅</h1>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/:slug" element={<Totem />} />
+        <Route path="/:slug/cozinha" element={<EmConstrucao nome="KDS da cozinha" />} />
+        <Route path="/:slug/admin" element={<EmConstrucao nome="Painel do dono" />} />
+        <Route path="*" element={<EnderecoInvalido />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
+
+function EmConstrucao({ nome }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+      <p className="text-4xl font-bold">{nome}</p>
+      <p className="text-2xl opacity-60">Ainda não construído.</p>
     </div>
   )
 }
 
-export default App
+// Acontece quando alguem abre a raiz do site sem informar a loja.
+function EnderecoInvalido() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+      <p className="text-4xl font-bold">Endereço inválido</p>
+      <p className="text-2xl opacity-60">Cada estabelecimento tem seu próprio endereço.</p>
+    </div>
+  )
+}

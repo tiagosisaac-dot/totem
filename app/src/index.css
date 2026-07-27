@@ -1,1 +1,33 @@
 @import "tailwindcss";
+
+/* ============================================================
+   BASE DO TOTEM
+
+   Roda em tablet Android, em modo quiosque, operado por gente
+   com pressa. Vários comportamentos normais de navegador
+   atrapalham nesse cenário e ficam desligados aqui.
+   ============================================================ */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /* cliente arrastando o dedo não seleciona texto sem querer */
+  user-select: none;
+  -webkit-user-select: none;
+
+  /* tira o atraso de 300ms no toque e o zoom no toque duplo */
+  touch-action: manipulation;
+
+  /* tira o retângulo cinza que o Android pisca ao tocar */
+  -webkit-tap-highlight-color: transparent;
+
+  /* impede "puxar para atualizar" e o efeito elástico ao rolar */
+  overscroll-behavior: none;
+}

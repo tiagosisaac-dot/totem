@@ -1,10 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>app</title>
+    <!-- maximum-scale e user-scalable travam o zoom por pinça: em
+         quiosque, o cliente que dá zoom sem querer não sabe voltar -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <!-- título neutro; o nome da loja vem do banco e é aplicado
+         pelo código, nunca escrito aqui (REGRA 1) -->
+    <title>Autoatendimento</title>
   </head>
   <body>
     <div id="root"></div>
