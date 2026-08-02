@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
+import Cardapio from '../componentes/Cardapio.jsx'
 
 export default function Totem() {
   const { slug } = useParams()
@@ -99,20 +100,16 @@ export default function Totem() {
 
   if (iniciado) {
     return (
-      <div
-        className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center"
-        style={{ backgroundColor: corFundo, color: corTexto }}
-      >
-        <p className="text-4xl font-bold">Cardápio entra aqui</p>
-        <p className="text-2xl opacity-70">Próxima etapa da construção.</p>
-        <button
-          onClick={() => setIniciado(false)}
-          className="min-h-[60px] rounded-2xl border-4 px-10 py-4 text-2xl font-bold active:scale-95"
-          style={{ borderColor: corTexto }}
-        >
-          Voltar
-        </button>
-      </div>
+      <Cardapio
+        loja={loja}
+        corTexto={corTexto}
+        corFundo={corFundo}
+        aoVoltar={() => setIniciado(false)}
+        aoEscolherProduto={(produto) => {
+          // proxima etapa: tela do produto com os grupos de opcoes
+          console.log('produto escolhido:', produto.nome)
+        }}
+      />
     )
   }
 
