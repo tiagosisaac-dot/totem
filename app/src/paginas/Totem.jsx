@@ -1,24 +1,27 @@
 // ============================================================
-// TOTEM — tela inicial
+// TOTEM — controla em que etapa do pedido o cliente esta
 //
 // Busca o estabelecimento pelo endereco (/:slug). Nome, logo e
 // cores vem do BANCO, nunca escritos aqui (REGRA 1): e o mesmo
 // codigo servindo todos os clientes.
 //
-// As proximas etapas (cardapio, produto, carrinho, numero da
-// mesa) entram neste arquivo depois.
+// Etapas: inicial -> cardapio -> produto -> (carrinho -> mesa)
+// As duas ultimas entram depois.
 // ============================================================
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import Cardapio from '../componentes/Cardapio.jsx'
+import Produto from '../componentes/Produto.jsx'
 
 export default function Totem() {
   const { slug } = useParams()
   const [estado, setEstado] = useState('carregando')
   const [loja, setLoja] = useState(null)
-  const [iniciado, setIniciado] = useState(false)
+  const [etapa, setEtapa] = useState('inicial')
+  const [produtoAberto, setProdutoAberto] = useState(null)
+  const [carrinho, setCarrinho] = useState([])
 
   useEffect(() => {
     let cancelado = false
@@ -98,16 +101,32 @@ export default function Totem() {
     )
   }
 
-  if (iniciado) {
+  if (etapa === 'produto') {
+    return (
+      <Produto
+        produto={produtoAberto}
+        corTexto={corTexto}
+        corFundo={corFundo}
+        aoVoltar={() => setEtapa('cardapio')}
+        aoAdicionar={(item) => {
+          setCarrinho((atual) => [...atual, item])
+          setEtapa('cardapio')
+        }}
+      />
+    )
+  }
+
+  if (etapa === 'cardapio') {
     return (
       <Cardapio
         loja={loja}
         corTexto={corTexto}
         corFundo={corFundo}
-        aoVoltar={() => setIniciado(false)}
+        carrinho={carrinho}
+        aoVoltar={() => setEtapa('inicial')}
         aoEscolherProduto={(produto) => {
-          // proxima etapa: tela do produto com os grupos de opcoes
-          console.log('produto escolhido:', produto.nome)
+          setProdutoAberto(produto)
+          setEtapa('produto')
         }}
       />
     )
@@ -117,7 +136,7 @@ export default function Totem() {
   // pontaria — o alvo de toque e tudo que o cliente ve.
   return (
     <button
-      onClick={() => setIniciado(true)}
+      onClick={() => setEtapa('cardapio')}
       className="flex h-full w-full flex-col items-center justify-center gap-12 p-8 text-center active:opacity-80"
       style={{ backgroundColor: corFundo, color: corTexto }}
     >

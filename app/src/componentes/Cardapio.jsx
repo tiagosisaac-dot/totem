@@ -15,7 +15,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { emReais } from '../lib/formato.js'
 
-export default function Cardapio({ loja, corTexto, corFundo, aoVoltar, aoEscolherProduto }) {
+export default function Cardapio({
+  loja,
+  corTexto,
+  corFundo,
+  carrinho = [],
+  aoVoltar,
+  aoEscolherProduto,
+}) {
   const [estado, setEstado] = useState('carregando')
   const [categorias, setCategorias] = useState([])
   const [produtos, setProdutos] = useState([])
@@ -36,7 +43,9 @@ export default function Cardapio({ loja, corTexto, corFundo, aoVoltar, aoEscolhe
           .order('ordem'),
         supabase
           .from('produtos')
-          .select('id, categoria_id, nome, descricao, preco, imagem_url, disponivel, ordem')
+          // 'tipo' e essencial: e o que diz se o produto abre com
+          // grupos de opcoes ou com os slots do combo
+          .select('id, categoria_id, nome, descricao, preco, imagem_url, tipo, disponivel, ordem')
           .eq('estabelecimento_id', loja.id)
           // produto que so existe dentro de combo nao aparece avulso
           .eq('vendavel_sozinho', true)
@@ -92,6 +101,7 @@ export default function Cardapio({ loja, corTexto, corFundo, aoVoltar, aoEscolhe
   }
 
   const produtosDaCategoria = produtos.filter((p) => p.categoria_id === categoriaAtual)
+  const itensNoCarrinho = carrinho.reduce((soma, item) => soma + item.quantidade, 0)
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: corFundo, color: corTexto }}>
@@ -105,6 +115,16 @@ export default function Cardapio({ loja, corTexto, corFundo, aoVoltar, aoEscolhe
           ← Início
         </button>
         <h1 className="text-3xl font-black">{loja.nome}</h1>
+
+        {/* contador do carrinho. Vira botao "Ver pedido" na proxima etapa */}
+        {itensNoCarrinho > 0 && (
+          <span
+            className="ml-auto rounded-2xl px-6 py-3 text-2xl font-black"
+            style={{ backgroundColor: corTexto, color: corFundo }}
+          >
+            {itensNoCarrinho} {itensNoCarrinho === 1 ? 'item' : 'itens'}
+          </span>
+        )}
       </header>
 
       <div className="flex min-h-0 flex-1">
