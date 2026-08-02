@@ -21,6 +21,7 @@ export default function Cardapio({
   corFundo,
   carrinho = [],
   aoVoltar,
+  aoVerPedido,
   aoEscolherProduto,
 }) {
   const [estado, setEstado] = useState('carregando')
@@ -116,14 +117,14 @@ export default function Cardapio({
         </button>
         <h1 className="text-3xl font-black">{loja.nome}</h1>
 
-        {/* contador do carrinho. Vira botao "Ver pedido" na proxima etapa */}
         {itensNoCarrinho > 0 && (
-          <span
-            className="ml-auto rounded-2xl px-6 py-3 text-2xl font-black"
+          <button
+            onClick={aoVerPedido}
+            className="ml-auto min-h-[60px] rounded-2xl px-6 py-3 text-2xl font-black active:scale-95"
             style={{ backgroundColor: corTexto, color: corFundo }}
           >
-            {itensNoCarrinho} {itensNoCarrinho === 1 ? 'item' : 'itens'}
-          </span>
+            Ver pedido ({itensNoCarrinho})
+          </button>
         )}
       </header>
 

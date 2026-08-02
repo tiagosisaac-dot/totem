@@ -14,6 +14,8 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import Cardapio from '../componentes/Cardapio.jsx'
 import Produto from '../componentes/Produto.jsx'
+import Carrinho from '../componentes/Carrinho.jsx'
+import NumeroMesa from '../componentes/NumeroMesa.jsx'
 
 export default function Totem() {
   const { slug } = useParams()
@@ -101,6 +103,36 @@ export default function Totem() {
     )
   }
 
+  if (etapa === 'mesa') {
+    return (
+      <NumeroMesa
+        slug={slug}
+        carrinho={carrinho}
+        corTexto={corTexto}
+        corFundo={corFundo}
+        aoVoltar={() => setEtapa('carrinho')}
+        aoConcluir={() => {
+          // pedido concluido: limpa tudo para o proximo cliente
+          setCarrinho([])
+          setEtapa('inicial')
+        }}
+      />
+    )
+  }
+
+  if (etapa === 'carrinho') {
+    return (
+      <Carrinho
+        carrinho={carrinho}
+        corTexto={corTexto}
+        corFundo={corFundo}
+        aoVoltar={() => setEtapa('cardapio')}
+        aoRemover={(indice) => setCarrinho((atual) => atual.filter((_, i) => i !== indice))}
+        aoFinalizar={() => setEtapa('mesa')}
+      />
+    )
+  }
+
   if (etapa === 'produto') {
     return (
       <Produto
@@ -124,6 +156,7 @@ export default function Totem() {
         corFundo={corFundo}
         carrinho={carrinho}
         aoVoltar={() => setEtapa('inicial')}
+        aoVerPedido={() => setEtapa('carrinho')}
         aoEscolherProduto={(produto) => {
           setProdutoAberto(produto)
           setEtapa('produto')

@@ -163,6 +163,21 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
   }
 
   function confirmar() {
+    // nomes do que foi escolhido, SO PARA EXIBIR no carrinho.
+    // O que vai para o servidor sao os ids, logo abaixo.
+    const resumo = [
+      ...slots.flatMap((slot) =>
+        (escolhasCombo[slot.id] ?? []).map(
+          (id) => slot.combo_slot_produtos.find((p) => p.produtos?.id === id)?.produtos?.nome,
+        ),
+      ),
+      ...grupos.flatMap((grupo) =>
+        (selecionadas[grupo.id] ?? []).map(
+          (id) => grupo.opcoes.find((o) => o.id === id)?.nome,
+        ),
+      ),
+    ].filter(Boolean)
+
     aoAdicionar({
       produto,
       quantidade,
@@ -172,6 +187,8 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
       comboEscolhas: Object.entries(escolhasCombo).flatMap(([slotId, produtos]) =>
         produtos.map((produtoId) => ({ slot_id: slotId, produto_id: produtoId })),
       ),
+      resumo,
+      totalMostrado, // vitrine; o servidor recalcula
     })
   }
 
