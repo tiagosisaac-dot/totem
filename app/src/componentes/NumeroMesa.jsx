@@ -29,6 +29,7 @@ export default function NumeroMesa({
   corTexto,
   corFundo,
   aoVoltar,
+  aoOcupado,
   aoConcluir,
 }) {
   const [digitado, setDigitado] = useState('')
@@ -37,6 +38,13 @@ export default function NumeroMesa({
   const [pedido, setPedido] = useState(null)
   const [restam, setRestam] = useState(SEGUNDOS_ATE_VOLTAR)
   const fecharEm = useRef(null)
+
+  // Avisa o totem para PARAR o relogio de inatividade enquanto o
+  // pedido esta indo (ou acabou de ir). Limpar a tela no meio de um
+  // envio lento faria o cliente achar que falhou, com o pedido gravado.
+  useEffect(() => {
+    aoOcupado?.(etapa === 'enviando' || etapa === 'enviado')
+  }, [etapa, aoOcupado])
 
   const total = carrinho.reduce((soma, item) => soma + item.totalMostrado, 0)
   const borda = `${corTexto}22`
