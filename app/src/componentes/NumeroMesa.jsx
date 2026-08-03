@@ -9,12 +9,19 @@
 // comida entregue na mesa errada — vale um toque a mais.
 // ============================================================
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { enviarPedido } from '../lib/pedidos.js'
 import { emReais } from '../lib/formato.js'
 
 const MAX_DIGITOS = 3
-const SEGUNDOS_ATE_VOLTAR = 15
+
+// Tempo da tela de "pedido enviado" ate voltar sozinha ao inicio.
+// Curto de proposito: em horario de pico, cada segundo aqui e fila
+// la fora. Nada se perde quando a tela limpa — o cliente esta com a
+// plaquinha na mao e o caixa cobra por ela.
+//
+// Quem quiser sair antes tem o botao; a contagem e so o limite.
+const SEGUNDOS_ATE_VOLTAR = 5
 
 export default function NumeroMesa({
   slug,
@@ -28,16 +35,45 @@ export default function NumeroMesa({
   const [etapa, setEtapa] = useState('digitando')
   const [erro, setErro] = useState(null)
   const [pedido, setPedido] = useState(null)
+  const [restam, setRestam] = useState(SEGUNDOS_ATE_VOLTAR)
+  const fecharEm = useRef(null)
 
   const total = carrinho.reduce((soma, item) => soma + item.totalMostrado, 0)
   const borda = `${corTexto}22`
 
   // Depois de enviado, volta sozinho para a tela inicial: o proximo
   // cliente nao pode encontrar o pedido do anterior na tela.
+  //
+  // A contagem aparece na tela de proposito: quem esta esperando ve
+  // que o totem vai liberar, em vez de achar que travou.
+  // Guardamos a HORA de fechar, em vez de contar quantas vezes o
+  // cronometro disparou. Contando disparos, qualquer reinicio do
+  // cronometro (o React remonta a tela em desenvolvimento) empurra
+  // o fim para frente e a tela demora mais que o combinado.
   useEffect(() => {
     if (etapa !== 'enviado') return
-    const relogio = setTimeout(aoConcluir, SEGUNDOS_ATE_VOLTAR * 1000)
-    return () => clearTimeout(relogio)
+
+    if (fecharEm.current === null) {
+      fecharEm.current = Date.now() + SEGUNDOS_ATE_VOLTAR * 1000
+    }
+
+    function conferir() {
+      const faltam = Math.ceil((fecharEm.current - Date.now()) / 1000)
+      if (faltam <= 0) {
+        setRestam(0)
+        aoConcluir()
+        return true
+      }
+      setRestam(faltam)
+      return false
+    }
+
+    conferir()
+    const relogio = setInterval(() => {
+      if (conferir()) clearInterval(relogio)
+    }, 250)
+
+    return () => clearInterval(relogio)
   }, [etapa, aoConcluir])
 
   function digitar(numero) {
@@ -88,12 +124,14 @@ export default function NumeroMesa({
         <p className="text-4xl font-bold">Pague no caixa</p>
         <p className="text-2xl opacity-70">Deixe a plaquinha na mesa.</p>
 
+        {/* preenchido, nao so contornado: quem ja leu sai na hora e
+            libera o totem, sem esperar a contagem terminar */}
         <button
           onClick={aoConcluir}
-          className="mt-4 min-h-[76px] rounded-2xl border-4 px-12 py-4 text-2xl font-bold active:scale-95"
-          style={{ borderColor: corTexto }}
+          className="mt-4 min-h-[76px] rounded-2xl px-16 py-4 text-3xl font-black active:scale-95"
+          style={{ backgroundColor: corTexto, color: corFundo }}
         >
-          Concluir
+          Concluir ({restam})
         </button>
       </div>
     )
