@@ -210,13 +210,21 @@ Deno.serve(async (req) => {
     if (erroMesa) throw erroMesa
     if (!mesa) throw new ErroPedido(`Mesa ${mesaNumero} não existe. Confira o número.`)
 
-    // ---- esse numero ja esta em outro pedido em aberto? ----
+    // ---- essa plaquinha ainda esta fora? ----
+    //
+    // O que bloqueia NAO e o status do pedido: e a plaquinha nao ter
+    // voltado para a pilha. O prato pode ja ter sido entregue e a
+    // plaquinha continuar na mesa do cliente.
+    //
+    // E isso que pega o cliente que pega a plaquinha 9, le como 6 e
+    // digita 6: se a 6 estiver na mao de outra pessoa, o totem recusa.
     const { data: emAberto, error: erroAberto } = await sb
       .from('pedidos')
       .select('id, criado_em')
       .eq('estabelecimento_id', estab.id)
       .eq('mesa_numero', mesaNumero)
-      .in('status', ['aguardando_pagamento', 'em_producao', 'pronto'])
+      .is('plaquinha_devolvida_em', null)
+      .neq('status', 'cancelado')
 
     if (erroAberto) throw erroAberto
 

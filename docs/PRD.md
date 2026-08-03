@@ -83,8 +83,12 @@ Escopo fechado. O piloto precisa ir ao ar; nada fora desta lista entra agora.
 1. **Totem** (`/:slug`) — mesa → categorias → produto → personalização → carrinho
    → confirmação → senha
 2. **Cálculo de preço no servidor** — Edge Function `criar-pedido`
-3. **KDS da cozinha** (`/:slug/cozinha`) — pedidos em tempo real, botão "pronto",
-   número da mesa em destaque
+3. **KDS** (`/:slug/cozinha`) — pedidos em tempo real, número da mesa em destaque.
+   Divisão de trabalho deliberada: a **cozinha toca uma vez só** ("Pronto"), porque
+   mão engordurada não volta na tela. O **garçom** toca "Entregue" ao levar o prato
+   e "Devolvida" ao recolher a plaquinha. Contador de plaquinhas livres no alto,
+   para a equipe recolher antes de acabar — e não descobrir quando o totem recusar
+   um cliente
 4. **Painel do dono** (`/:slug/admin`) — esgotar/reativar item, mudar preço
 5. **Pagamento no caixa.** O totem só emite senha
 
@@ -107,6 +111,10 @@ Escopo fechado. O piloto precisa ir ao ar; nada fora desta lista entra agora.
 * **Operação:** cliente pede no totem, paga no caixa, **garçom leva o pedido à mesa**
 * **Plaquinhas:** 40 numeradas, ao lado do totem
   * **A DEFINIR:** quem produz as plaquinhas e quanto custa
+  * **Quantidade é decisão de produto, não detalhe.** Plaquinhas suficientes para
+    girar uma noite inteira tornam a devolução opcional: se sobra número, esquecer
+    de devolver deixa de ter consequência. Medir no piloto quantas ficam em uso no
+    pico e dimensionar a partir daí
 * **Quantos tablets:** **A DEFINIR**
 * **Data de início:** **A DEFINIR**
 * **Duração antes de decidir se vira produto:** **A DEFINIR**
@@ -149,15 +157,24 @@ trabalho do dono, não adiciona.
 
 ### Número já em uso
 
-Se o cliente digitar um número que está em outro pedido ainda aberto, o pedido é
-**recusado** e a tela pede para pegar outra plaquinha. No mesmo momento, o pedido
-antigo é destacado no painel da cozinha, para a equipe lembrar de confirmar a
-entrega e liberar o número.
+Um número fica bloqueado **desde o pedido até alguém marcar que a plaquinha voltou
+para a pilha** — não até a entrega. O prato sai e a plaquinha continua na mesa do
+cliente.
 
-**Limite importante:** só bloqueia se o pedido aberto for de **hoje**. Se a equipe
-esquecer de marcar entregas, os números iriam sendo bloqueados um a um até o totem
-recusar todo mundo — e um pedido esquecido ontem travaria aquela plaquinha para
-sempre.
+Se o cliente digitar um número bloqueado, o pedido é **recusado** e a tela pede
+para pegar outra plaquinha. O pedido antigo é destacado na cozinha para a equipe
+conferir.
+
+**Por que tão rígido:** é isso que pega o cliente que pega a plaquinha 9, lê como
+6 e digita 6. Se a 6 estiver na mão de outra pessoa, o totem recusa em vez de
+criar dois pedidos com o mesmo número.
+
+**Solução física, mais barata que qualquer software:** marcar um ponto embaixo do
+número nas plaquinhas (`6.` e `9.`) elimina a confusão na origem.
+
+**Limite de segurança:** só bloqueia se o pedido for de **hoje**. Plaquinha
+esquecida ontem não trava o número hoje — senão os números iriam sumindo um a um
+até o totem recusar todo mundo.
 
 **Diretrizes de tela:** alvo de toque mínimo 60px, fonte grande, contraste alto.
 É usado em pé, com pressa, por gente de todas as idades. Nada de menu discreto

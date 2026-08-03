@@ -148,8 +148,10 @@ Não construa nada fora desta lista. O piloto precisa ir ao ar.
 1. **Totem** (`/:slug`) — categorias → produto → personalização → carrinho
 → digita o número da plaquinha → confirma
 2. **Edge Function `criar-pedido`** — valida, recalcula total ✅ *pronta*
-3. **KDS** (`/:slug/cozinha`) — pedidos em tempo real, botão "pronto".
-Número da mesa em destaque, maior que o nome do produto
+3. **KDS** (`/:slug/cozinha`) — pedidos em tempo real, número da mesa em destaque,
+maior que o nome do produto. **A cozinha toca UMA vez ("Pronto")** — mão
+engordurada não volta na tela. O garçom toca "Entregue" e depois "Devolvida"
+(é a devolução que libera o número, não a entrega)
 4. **Painel do dono** (`/:slug/admin`) — esgotar/reativar item, mudar preço
 5. **Pagamento: no caixa.** O cliente fala o número da mesa no caixa
 
@@ -185,9 +187,10 @@ tipo desktop.
 * **Cliente desiste no meio** — timeout de inatividade limpa o carrinho
 * **Mesa errada** — confirmação explícita antes de enviar
 * **Número de plaquinha repetido** — recusa o pedido, manda pegar outra plaquinha
-e marca `alerta\_reuso\_em` no pedido antigo para o KDS destacar. Só bloqueia se o
-pedido aberto for **de hoje**: se a equipe esquecer de marcar entrega, os números
-não podem ir sumindo até o totem travar
+e marca `alerta\_reuso\_em` no pedido antigo para o KDS destacar. O que bloqueia é
+`plaquinha\_devolvida\_em` estar nulo, **não** o status: o prato é entregue e a
+plaquinha continua na mesa. Só considera pedidos **de hoje**, senão os números vão
+sumindo até o totem travar
 * **Totem caiu** — heartbeat, Isaac precisa saber antes do dono ligar
 
 \---

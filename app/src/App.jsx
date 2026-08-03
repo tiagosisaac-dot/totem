@@ -3,7 +3,8 @@
 //
 // Um codigo so serve os quatro destinos. O que muda e o endereco:
 //   /adoravelburguer          -> totem do salao
-//   /adoravelburguer/cozinha  -> KDS da cozinha
+//   /adoravelburguer/cozinha  -> so o que esta em producao
+//   /adoravelburguer/balcao   -> prontos + devolucao de plaquinha
 //   /adoravelburguer/admin    -> painel do dono
 //
 // O 'slug' na frente e o que identifica de qual estabelecimento a
@@ -13,6 +14,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Totem from './paginas/Totem.jsx'
 import Cozinha from './paginas/Cozinha.jsx'
+import Balcao from './paginas/Balcao.jsx'
 
 export default function App() {
   return (
@@ -20,6 +22,7 @@ export default function App() {
       <Routes>
         <Route path="/:slug" element={<Totem />} />
         <Route path="/:slug/cozinha" element={<Cozinha />} />
+        <Route path="/:slug/balcao" element={<Balcao />} />
         <Route path="/:slug/admin" element={<EmConstrucao nome="Painel do dono" />} />
         <Route path="*" element={<EnderecoInvalido />} />
       </Routes>
