@@ -12,13 +12,14 @@
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Totem from './paginas/Totem.jsx'
+import Cozinha from './paginas/Cozinha.jsx'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/:slug" element={<Totem />} />
-        <Route path="/:slug/cozinha" element={<EmConstrucao nome="KDS da cozinha" />} />
+        <Route path="/:slug/cozinha" element={<Cozinha />} />
         <Route path="/:slug/admin" element={<EmConstrucao nome="Painel do dono" />} />
         <Route path="*" element={<EnderecoInvalido />} />
       </Routes>
