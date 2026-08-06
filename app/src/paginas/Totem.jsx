@@ -33,13 +33,27 @@ export default function Totem() {
   // relogio de inatividade fica parado: limpar a tela no meio de um
   // envio lento faria o cliente achar que falhou, com o pedido ja gravado
   const [enviando, setEnviando] = useState(false)
+  const [avisoEsgotado, setAvisoEsgotado] = useState(null)
 
   const recomecar = useCallback(() => {
     setCarrinho([])
     setProdutoAberto(null)
     setEnviando(false)
+    setAvisoEsgotado(null)
     setEtapa('inicial')
   }, [])
+
+  // O servidor recusou porque um item esgotou enquanto o cliente
+  // pedia. Marca a linha e devolve ele ao carrinho: pedir outro
+  // numero de mesa nao resolveria, o problema esta no pedido.
+  function marcarItemEsgotado(indice, mensagem) {
+    setCarrinho((atual) =>
+      atual.map((item, i) => (i === indice ? { ...item, esgotado: true } : item)),
+    )
+    setAvisoEsgotado(mensagem)
+    setEnviando(false)
+    setEtapa('carrinho')
+  }
 
   const inatividade = useInatividade({
     ativo: etapa !== 'inicial' && !enviando,
@@ -151,6 +165,7 @@ export default function Totem() {
         corFundo={corFundo}
         aoVoltar={() => setEtapa('carrinho')}
         aoOcupado={setEnviando}
+        aoItemEsgotado={marcarItemEsgotado}
         aoConcluir={recomecar}
       />,
     )
@@ -162,8 +177,16 @@ export default function Totem() {
         carrinho={carrinho}
         corTexto={corTexto}
         corFundo={corFundo}
-        aoVoltar={() => setEtapa('cardapio')}
-        aoRemover={(indice) => setCarrinho((atual) => atual.filter((_, i) => i !== indice))}
+        avisoEsgotado={avisoEsgotado}
+        aoVoltar={() => {
+          setAvisoEsgotado(null)
+          setEtapa('cardapio')
+        }}
+        aoRemover={(indice) => {
+          setCarrinho((atual) => atual.filter((_, i) => i !== indice))
+          // resolvido: o aviso sai junto com o item
+          setAvisoEsgotado(null)
+        }}
         aoFinalizar={() => setEtapa('mesa')}
       />,
     )

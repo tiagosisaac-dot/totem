@@ -11,7 +11,7 @@
 // o totem mostraria produto de outro estabelecimento.
 // ============================================================
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { emReais } from '../lib/formato.js'
 
@@ -29,11 +29,11 @@ export default function Cardapio({
   const [produtos, setProdutos] = useState([])
   const [categoriaAtual, setCategoriaAtual] = useState(null)
 
-  useEffect(() => {
-    let cancelado = false
-
-    async function carregarCardapio() {
-      setEstado('carregando')
+  const carregarCardapio = useCallback(
+    async ({ primeiraVez } = {}) => {
+      // Recarregar por aviso do banco nao deve piscar "Carregando":
+      // o cliente pode estar olhando a lista nesse instante.
+      if (primeiraVez) setEstado('carregando')
 
       const [respCategorias, respProdutos] = await Promise.all([
         supabase
@@ -53,25 +53,60 @@ export default function Cardapio({
           .order('ordem'),
       ])
 
-      if (cancelado) return
-
       if (respCategorias.error || respProdutos.error) {
         console.error('Falha ao carregar o cardápio:', respCategorias.error || respProdutos.error)
-        setEstado('erro')
+        if (primeiraVez) setEstado('erro')
         return
       }
 
       setCategorias(respCategorias.data)
       setProdutos(respProdutos.data)
-      setCategoriaAtual(respCategorias.data[0]?.id ?? null)
+      // nao muda a categoria escolhida num recarregamento: tirar o
+      // cliente da categoria que ele estava vendo seria pior que
+      // mostrar um preco velho por alguns segundos
+      setCategoriaAtual((atual) => atual ?? respCategorias.data[0]?.id ?? null)
       setEstado('pronto')
-    }
+    },
+    [loja.id],
+  )
 
-    carregarCardapio()
+  useEffect(() => {
+    carregarCardapio({ primeiraVez: true })
+  }, [carregarCardapio])
+
+  // Tempo real: o dono toca em "Esgotado" no painel e o item apaga
+  // aqui na hora, mesmo com o cliente olhando a tela.
+  //
+  // Isso REDUZ a recusa no fim do pedido, nao elimina: se o item
+  // esgotar no mesmo segundo do envio, o servidor ainda recusa — e
+  // tem que recusar. Quem decide e o banco.
+  useEffect(() => {
+    let atraso = null
+
+    const canal = supabase
+      .channel(`cardapio-${loja.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'produtos',
+          // sem este filtro o totem reagiria a mudanca de outra loja:
+          // a leitura de cardapio e publica por decisao nossa
+          filter: `estabelecimento_id=eq.${loja.id}`,
+        },
+        () => {
+          clearTimeout(atraso)
+          atraso = setTimeout(carregarCardapio, 300)
+        },
+      )
+      .subscribe()
+
     return () => {
-      cancelado = true
+      clearTimeout(atraso)
+      supabase.removeChannel(canal)
     }
-  }, [loja.id])
+  }, [loja.id, carregarCardapio])
 
   if (estado === 'carregando') {
     return <Recado texto="Carregando o cardápio..." corTexto={corTexto} corFundo={corFundo} />

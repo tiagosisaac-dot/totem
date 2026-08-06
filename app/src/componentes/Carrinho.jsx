@@ -7,17 +7,23 @@
 // ============================================================
 
 import { emReais } from '../lib/formato.js'
+import { ALERTA } from './PainelComuns.jsx'
 
 export default function Carrinho({
   carrinho,
   corTexto,
   corFundo,
+  avisoEsgotado,
   aoVoltar,
   aoRemover,
   aoFinalizar,
 }) {
   const total = carrinho.reduce((soma, item) => soma + item.totalMostrado, 0)
   const borda = `${corTexto}22`
+
+  // enquanto houver item esgotado, finalizar so levaria a outra
+  // recusa: melhor travar aqui e mostrar o que resolver
+  const temEsgotado = carrinho.some((item) => item.esgotado)
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: corFundo, color: corTexto }}>
@@ -32,6 +38,16 @@ export default function Carrinho({
         <h1 className="text-3xl font-black">Seu pedido</h1>
       </header>
 
+      {avisoEsgotado && (
+        <p
+          className="px-6 py-5 text-2xl font-bold text-white"
+          style={{ backgroundColor: ALERTA }}
+          role="alert"
+        >
+          {avisoEsgotado} Remova o item marcado para continuar.
+        </p>
+      )}
+
       <div className="min-h-0 flex-1 overflow-y-auto p-6" style={{ overscrollBehavior: 'contain' }}>
         {carrinho.length === 0 ? (
           <p className="mt-12 text-center text-3xl opacity-60">Seu pedido está vazio.</p>
@@ -41,11 +57,15 @@ export default function Carrinho({
               <li
                 key={indice}
                 className="flex items-start gap-4 rounded-3xl border-4 p-5"
-                style={{ borderColor: borda }}
+                style={{ borderColor: item.esgotado ? ALERTA : borda }}
               >
                 <span
                   className="shrink-0 rounded-xl px-4 py-2 text-3xl font-black"
-                  style={{ backgroundColor: corTexto, color: corFundo }}
+                  style={
+                    item.esgotado
+                      ? { backgroundColor: ALERTA, color: '#FFFFFF' }
+                      : { backgroundColor: corTexto, color: corFundo }
+                  }
                 >
                   {item.quantidade}×
                 </span>
@@ -55,17 +75,28 @@ export default function Carrinho({
                   {item.resumo.length > 0 && (
                     <p className="mt-1 text-xl opacity-70">{item.resumo.join(' • ')}</p>
                   )}
+                  {item.esgotado && (
+                    <p className="mt-1 text-xl font-black" style={{ color: ALERTA }}>
+                      Esgotou — remova para continuar
+                    </p>
+                  )}
                 </div>
 
                 <span className="shrink-0 text-3xl font-black">{emReais(item.totalMostrado)}</span>
 
                 {/* alvo de toque grande e afastado do resto: remover
-                    por engano no fim do pedido e irritante */}
+                    por engano no fim do pedido e irritante.
+                    Quando o item esgotou, virar o botao de cor faz o
+                    cliente achar o que precisa tocar sem procurar. */}
                 <button
                   onClick={() => aoRemover(indice)}
                   aria-label={`Remover ${item.produto.nome}`}
                   className="ml-2 h-[64px] w-[64px] shrink-0 rounded-2xl border-4 text-3xl font-black active:scale-95"
-                  style={{ borderColor: corTexto }}
+                  style={
+                    item.esgotado
+                      ? { backgroundColor: ALERTA, borderColor: ALERTA, color: '#FFFFFF' }
+                      : { borderColor: corTexto }
+                  }
                 >
                   ×
                 </button>
@@ -83,7 +114,7 @@ export default function Carrinho({
 
         <button
           onClick={aoFinalizar}
-          disabled={carrinho.length === 0}
+          disabled={carrinho.length === 0 || temEsgotado}
           className="min-h-[76px] flex-1 rounded-2xl px-8 text-3xl font-black disabled:opacity-40 active:enabled:scale-95"
           style={{ backgroundColor: corTexto, color: corFundo }}
         >

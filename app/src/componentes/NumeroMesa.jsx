@@ -30,6 +30,7 @@ export default function NumeroMesa({
   corFundo,
   aoVoltar,
   aoOcupado,
+  aoItemEsgotado,
   aoConcluir,
 }) {
   const [digitado, setDigitado] = useState('')
@@ -99,6 +100,15 @@ export default function NumeroMesa({
     })
 
     if (!resultado.ok) {
+      // Item esgotou no meio do pedido: nao adianta pedir outro numero
+      // de mesa, o problema esta no carrinho. Manda o cliente de volta
+      // para lá, com a linha marcada — descobrir isso no fim e o pior
+      // momento possivel, mas pelo menos ele ve o que resolver.
+      if (resultado.codigo === 'item_esgotado') {
+        aoItemEsgotado?.(resultado.item, resultado.mensagem)
+        return
+      }
+
       // NUNCA limpar o carrinho aqui: o cliente vai querer tentar
       // outro numero, nao refazer o pedido inteiro.
       setErro(resultado.mensagem)

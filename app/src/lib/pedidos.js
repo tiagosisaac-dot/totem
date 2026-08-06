@@ -37,14 +37,20 @@ export async function enviarPedido({ slug, mesaNumero, carrinho }) {
     // em error.context — e de la que vem a mensagem que o cliente
     // precisa ler ("pegue outra plaquinha", "item esgotado").
     let mensagem = 'Não foi possível enviar o pedido. Tente novamente.'
+    let codigo = null
+    let item = null
     try {
       const detalhe = await error.context?.json()
       if (detalhe?.erro) mensagem = detalhe.erro
+      // codigo e indice vem do servidor para o totem AGIR, nao so
+      // exibir. Nunca deduzir o motivo lendo a mensagem.
+      codigo = detalhe?.codigo ?? null
+      item = Number.isInteger(detalhe?.item) ? detalhe.item : null
     } catch {
       // resposta sem corpo legivel: fica a mensagem generica
     }
     console.error('Pedido recusado:', error)
-    return { ok: false, mensagem }
+    return { ok: false, mensagem, codigo, item }
   }
 
   return { ok: true, pedido: data }

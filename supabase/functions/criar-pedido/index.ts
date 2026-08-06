@@ -62,12 +62,21 @@ function resposta(corpo: unknown, status = 200) {
   })
 }
 
-// Erro que o totem sabe mostrar para o cliente
+// Erro que o totem sabe mostrar para o cliente.
+//
+// 'extra' carrega informacao para o totem AGIR, nao so exibir:
+//   codigo: 'item_esgotado'  -> leva o cliente de volta ao carrinho
+//   item: indice do item na lista enviada -> qual linha destacar
+//
+// O totem nunca deve adivinhar o motivo lendo a frase: mudar o texto
+// da mensagem quebraria o comportamento sem ninguem perceber.
 class ErroPedido extends Error {
   status: number
-  constructor(mensagem: string, status = 400) {
+  extra: Record<string, unknown>
+  constructor(mensagem: string, status = 400, extra: Record<string, unknown> = {}) {
     super(mensagem)
     this.status = status
+    this.extra = extra
   }
 }
 
@@ -374,7 +383,12 @@ Deno.serve(async (req) => {
       const rotulo = `Item ${i + 1}`
 
       if (!produto) throw new ErroPedido(`${rotulo}: produto não encontrado no cardápio.`)
-      if (!produto.disponivel) throw new ErroPedido(`${produto.nome} está esgotado.`, 409)
+      if (!produto.disponivel) {
+        throw new ErroPedido(`${produto.nome} está esgotado.`, 409, {
+          codigo: 'item_esgotado',
+          item: i,
+        })
+      }
       if (!produto.vendavel_sozinho) {
         throw new ErroPedido(`${produto.nome} só pode ser pedido dentro de um combo.`)
       }
@@ -394,7 +408,12 @@ Deno.serve(async (req) => {
         if (!idsPermitidos.has(opcao.grupo_id)) {
           throw new ErroPedido(`${rotulo}: "${opcao.nome}" não é uma opção de ${produto.nome}.`)
         }
-        if (!opcao.disponivel) throw new ErroPedido(`${opcao.nome} está esgotado.`, 409)
+        if (!opcao.disponivel) {
+          throw new ErroPedido(`${opcao.nome} está esgotado.`, 409, {
+            codigo: 'item_esgotado',
+            item: i,
+          })
+        }
 
         escolhidasPorGrupo.set(opcao.grupo_id, (escolhidasPorGrupo.get(opcao.grupo_id) ?? 0) + 1)
         extrasCentavos += paraCentavos(opcao.preco_adicional)
@@ -453,7 +472,12 @@ Deno.serve(async (req) => {
             }
             const filho = mapaProdutos.get(escolha.produto_id)
             if (!filho) throw new ErroPedido(`${rotulo}: produto do combo não encontrado.`)
-            if (!filho.disponivel) throw new ErroPedido(`${filho.nome} está esgotado.`, 409)
+            if (!filho.disponivel) {
+              throw new ErroPedido(`${filho.nome} está esgotado.`, 409, {
+                codigo: 'item_esgotado',
+                item: i,
+              })
+            }
 
             // dentro do combo cobra-se apenas o upgrade, nao o preco cheio
             const upgrade = paraCentavos(permitido.preco_adicional)
@@ -568,7 +592,7 @@ Deno.serve(async (req) => {
     }
 
     if (e instanceof ErroPedido) {
-      return resposta({ erro: e.message }, e.status)
+      return resposta({ erro: e.message, ...e.extra }, e.status)
     }
 
     // erro inesperado: detalhe fica no log, cliente ve mensagem generica
