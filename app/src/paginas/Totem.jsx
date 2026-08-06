@@ -43,12 +43,17 @@ export default function Totem() {
     setEtapa('inicial')
   }, [])
 
-  // O servidor recusou porque um item esgotou enquanto o cliente
-  // pedia. Marca a linha e devolve ele ao carrinho: pedir outro
-  // numero de mesa nao resolveria, o problema esta no pedido.
-  function marcarItemEsgotado(indice, mensagem) {
+  // O servidor recusou porque algo esgotou enquanto o cliente pedia.
+  // Devolve ele ao carrinho com TODAS as linhas afetadas marcadas —
+  // pedir outro numero de mesa nao resolveria, o problema esta no
+  // pedido. Um refrigerante esgotado invalida a linha dele e tambem
+  // a do combo que o contem.
+  function marcarItensEsgotados(itens, mensagem) {
     setCarrinho((atual) =>
-      atual.map((item, i) => (i === indice ? { ...item, esgotado: true } : item)),
+      atual.map((item, i) => {
+        const achado = itens.find((e) => e.indice === i)
+        return achado ? { ...item, esgotado: true, motivo: `${achado.nome} esgotou` } : item
+      }),
     )
     setAvisoEsgotado(mensagem)
     setEnviando(false)
@@ -165,7 +170,7 @@ export default function Totem() {
         corFundo={corFundo}
         aoVoltar={() => setEtapa('carrinho')}
         aoOcupado={setEnviando}
-        aoItemEsgotado={marcarItemEsgotado}
+        aoItemEsgotado={marcarItensEsgotados}
         aoConcluir={recomecar}
       />,
     )
@@ -183,9 +188,13 @@ export default function Totem() {
           setEtapa('cardapio')
         }}
         aoRemover={(indice) => {
-          setCarrinho((atual) => atual.filter((_, i) => i !== indice))
-          // resolvido: o aviso sai junto com o item
-          setAvisoEsgotado(null)
+          setCarrinho((atual) => {
+            const restante = atual.filter((_, i) => i !== indice)
+            // o aviso do topo so sai quando NENHUMA linha estiver
+            // marcada: com duas esgotadas, tirar uma nao resolveu
+            if (!restante.some((item) => item.esgotado)) setAvisoEsgotado(null)
+            return restante
+          })
         }}
         aoFinalizar={() => setEtapa('mesa')}
       />,

@@ -75,9 +75,11 @@ export default function Carrinho({
                   {item.resumo.length > 0 && (
                     <p className="mt-1 text-xl opacity-70">{item.resumo.join(' • ')}</p>
                   )}
+                  {/* motivo especifico: num combo o que esgotou nao e o
+                      combo, e o item escolhido dentro dele */}
                   {item.esgotado && (
                     <p className="mt-1 text-xl font-black" style={{ color: ALERTA }}>
-                      Esgotou — remova para continuar
+                      {item.motivo ?? 'Esgotou'} — remova para continuar
                     </p>
                   )}
                 </div>

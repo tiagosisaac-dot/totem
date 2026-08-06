@@ -105,7 +105,7 @@ export default function NumeroMesa({
       // para lá, com a linha marcada — descobrir isso no fim e o pior
       // momento possivel, mas pelo menos ele ve o que resolver.
       if (resultado.codigo === 'item_esgotado') {
-        aoItemEsgotado?.(resultado.item, resultado.mensagem)
+        aoItemEsgotado?.(resultado.itens, resultado.mensagem)
         return
       }
 
