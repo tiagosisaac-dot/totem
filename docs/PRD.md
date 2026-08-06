@@ -250,7 +250,21 @@ prejuízo real.
 
 ---
 
-## 13. Perguntas abertas
+## 13. Decisões a reavaliar com mais clientes
+
+Decisões tomadas para o piloto que provavelmente mudam quando houver outros
+estabelecimentos. Não são dívida técnica — são escolhas conscientes com prazo.
+
+| Decisão | Por que agora | Quando reavaliar |
+|---|---|---|
+| **Só o dono marca item esgotado** | Em lanchonete pequena o dono está no salão durante o movimento | Cliente cujo dono não fica no salão. Aí a cozinha precisa marcar, e isso exige distinguir no banco "mudou disponibilidade" de "mudou preço", além de um botão na tela da cozinha |
+| **Quem pausa o totem** (`aceita_pedidos`) | Hoje qualquer usuário da loja pode. Não decidido de propósito | Pausar quando a cozinha está afogada é plausivelmente ação da cozinha, não do dono. Definir antes de fechar essa permissão |
+| **Plaquinha física em vez de senha sequencial** | Tira trabalho do dono: as plaquinhas voltam em qualquer ordem | Cliente que prefira senha chamada em voz alta. A função `proxima_senha` já existe no banco, sem uso, para esse caso |
+| **Cadastro de cardápio feito por Isaac** | Garante que o cardápio entre certo, e é oportunidade de conversar com o cliente | Quando o número de clientes tornar o onboarding manual o gargalo |
+
+---
+
+## 14. Perguntas abertas
 
 1. Valor da mensalidade
 2. O tablet é do dono ou entra no pacote?
