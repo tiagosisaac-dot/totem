@@ -82,30 +82,34 @@ totem, o KDS da cozinha, o painel do dono e o painel de chamada de senha.
 
 \---
 
-## ⚠️ ESTADO ATUAL: PROJETO ZERADO
+## ESTADO ATUAL — Fase 1 no ar em desenvolvimento
 
-**Nada foi executado ainda.** Não existe projeto Supabase populado, não existe
-projeto React, não existe nenhuma tabela. Os arquivos `.sql` na pasta
-`supabase/` foram escritos mas **nunca rodados**.
+Banco criado e populado, isolamento entre estabelecimentos testado na prática,
+projeto React rodando, Edge Function publicada. **Não recomece o setup.**
 
-Antes de escrever qualquer código de aplicação, conduza Isaac por este setup,
-**um item por vez**, confirmando cada um antes de seguir:
+Pronto e testado:
 
-1. Conta no Supabase criada e projeto novo criado (ele faz no navegador)
-2. `supabase/schema\_totem\_v1.sql` colado no SQL Editor e executado
-3. Bucket `cardapio` criado pelo painel, marcado como **público**
-4. `supabase/storage\_policies.sql` executado
-5. Teste de isolamento do bucket (está descrito no fim daquele arquivo) — não pule
-6. Node.js LTS instalado (o Claude Code não precisa, mas o projeto React precisa)
-7. Projeto React criado com Vite + Tailwind
-8. `.env.local` com a URL e a chave `anon` do Supabase, e `.gitignore` cobrindo ele
-9. Primeiro estabelecimento inserido à mão no banco, para ter o que testar
+* **Totem** (`/:slug`) — cardápio, opções, combos, carrinho, número da mesa,
+confirmação, envio, limpeza por inatividade
+* **Edge Function `criar-pedido`** — publicada; recusa fraude de total, número em
+uso e item esgotado
+* **Cozinha** (`/:slug/cozinha`) — tempo real, um toque ("Pronto")
+* **Balcão** (`/:slug/balcao`) — "Entregue", "Devolvida", contador de plaquinhas
+* **Painel do dono** (`/:slug/admin`) — esgotar/reativar e mudar preço
 
-Só depois disso comece a Edge Function.
+**Migrations rodam à mão.** Os arquivos `supabase/migracao\_00N\_*.sql` são colados
+por Isaac no SQL Editor do painel; não usamos `supabase db push`. Ao criar uma
+migration nova: escrever o arquivo, pedir para ele rodar, **e só publicar Edge
+Function que dependa dela depois** — senão o totem quebra no intervalo.
+Já rodadas: 002 (plaquinha), 003 (devolução), 004 (cardápio ao vivo).
+
+**Cardápio de teste:** ids que começam com `00000000-0000-4000-8000-` são falsos
+(`supabase/seed\_teste\_dev.sql`). Apagar quando o cardápio real entrar; o comando
+está comentado no fim daquele arquivo. As 40 mesas são reais e ficam.
 
 \---
 
-## Estrutura do banco (a ser criada pelos .sql)
+## Estrutura do banco
 
 **Tabelas:**
 
@@ -215,9 +219,20 @@ antiga. Não voltar. Reavaliar quando sair release com o patch
 
 ## Próximo passo
 
-O setup listado lá em cima, item por item. **Nada de código de aplicação antes
-do banco existir e o teste de isolamento passar.**
+A Fase 1 está fechada. Na fila, em ordem de risco:
 
-Depois: Edge Function `criar-pedido` (é a peça que garante a Regra 2),
-e em seguida a tela do totem.
+1. **Restringir alteração de preço ao dono.** Hoje a policy `prod\_dono` permite
+escrita a qualquer usuário do estabelecimento — inclusive o login da cozinha. O
+painel confere o papel na tela, mas isso é conveniência, não segurança. Preço é
+dinheiro; fechar no banco
+2. **Cardápio real do Adorável Burguer**, e apagar o de teste
+3. **Deploy na Vercel** com as variáveis de ambiente
+4. **Heartbeat** — Isaac saber que um totem caiu antes do dono ligar
+5. Preencher os **A DEFINIR** do `docs/PRD.md`: mensalidade, quem paga o tablet,
+critério de sucesso do piloto, e como o dono chama o suporte no meio do movimento
+
+**Princípio que apareceu várias vezes e vale repetir:** ação que mexe no dinheiro
+ou no pedido do cliente é sempre explícita, nunca silenciosa. Confirmação do
+número da mesa, botão "Alterar preço", item esgotado que fica marcado em vez de
+sumir do carrinho — é a mesma regra nos três casos.
 

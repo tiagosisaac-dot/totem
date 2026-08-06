@@ -228,18 +228,25 @@ prejuízo real.
 
 ## 12. Estado atual — 27/07/2026
 
-**Pronto e testado:**
+**A Fase 1 está construída e testada ponta a ponta.**
 
-* Banco criado com todas as tabelas, isolamento entre estabelecimentos
-  **testado na prática** (tentativa de gravar na pasta de outra loja foi barrada)
-* Armazenamento de imagens configurado
-* Edge Function `criar-pedido` publicada e testada, incluindo tentativa de fraude
-  enviando total zerado — o servidor devolveu o valor real
-* Recusa de número de plaquinha em uso, com aviso para a cozinha, testada
-* Projeto React criado
-* 40 números de plaquinha e um cardápio de teste cadastrados
+* Banco com isolamento entre estabelecimentos **testado na prática** (tentativa de
+  gravar na pasta de outra loja foi barrada)
+* `criar-pedido` publicada; recusa fraude de total zerado, plaquinha em uso e item
+  esgotado
+* Totem completo, com limpeza automática se o cliente desistir no meio
+* Cozinha (um toque) e balcão (entrega + devolução da plaquinha) em tempo real
+* Painel do dono: esgotar/reativar e mudar preço
+* Item que esgota aparece marcado no carrinho **na hora**, sem esperar o envio
 
-**Próximo:** telas do totem.
+**Na fila, em ordem de risco:**
+
+1. Restringir alteração de preço ao dono no banco — hoje o login da cozinha
+   também conseguiria (a barreira existe só na tela)
+2. Cadastrar o cardápio real e apagar o de teste
+3. Deploy na Vercel
+4. Heartbeat: saber que um totem caiu antes do dono ligar
+5. Responder as perguntas abertas da seção 13
 
 ---
 
