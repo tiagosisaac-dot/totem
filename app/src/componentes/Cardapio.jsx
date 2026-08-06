@@ -1,22 +1,19 @@
 // ============================================================
 // CARDAPIO — categorias na lateral, produtos na area principal
 //
-// Carrega tudo de uma vez ao abrir: sao poucos dados e a troca de
-// categoria fica instantanea, sem depender do wi-fi da loja a cada
-// toque.
-//
-// ATENCAO: as policies deixam QUALQUER UM ler o cardapio de
-// QUALQUER loja (e cardapio, nao e sigiloso). Por isso o filtro
-// .eq('estabelecimento_id') e obrigatorio nas consultas — sem ele
-// o totem mostraria produto de outro estabelecimento.
+// Nao busca dados: recebe o cardapio ja carregado e AO VIVO (ver
+// lib/useCardapio.js). O motivo de morar la fora e o carrinho, que
+// tambem precisa saber quando um item esgota.
 // ============================================================
 
-import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { useState } from 'react'
 import { emReais } from '../lib/formato.js'
 
 export default function Cardapio({
   loja,
+  estado,
+  categorias,
+  produtos,
   corTexto,
   corFundo,
   carrinho = [],
@@ -24,89 +21,12 @@ export default function Cardapio({
   aoVerPedido,
   aoEscolherProduto,
 }) {
-  const [estado, setEstado] = useState('carregando')
-  const [categorias, setCategorias] = useState([])
-  const [produtos, setProdutos] = useState([])
-  const [categoriaAtual, setCategoriaAtual] = useState(null)
-
-  const carregarCardapio = useCallback(
-    async ({ primeiraVez } = {}) => {
-      // Recarregar por aviso do banco nao deve piscar "Carregando":
-      // o cliente pode estar olhando a lista nesse instante.
-      if (primeiraVez) setEstado('carregando')
-
-      const [respCategorias, respProdutos] = await Promise.all([
-        supabase
-          .from('categorias')
-          .select('id, nome, ordem')
-          .eq('estabelecimento_id', loja.id)
-          .eq('ativa', true)
-          .order('ordem'),
-        supabase
-          .from('produtos')
-          // 'tipo' e essencial: e o que diz se o produto abre com
-          // grupos de opcoes ou com os slots do combo
-          .select('id, categoria_id, nome, descricao, preco, imagem_url, tipo, disponivel, ordem')
-          .eq('estabelecimento_id', loja.id)
-          // produto que so existe dentro de combo nao aparece avulso
-          .eq('vendavel_sozinho', true)
-          .order('ordem'),
-      ])
-
-      if (respCategorias.error || respProdutos.error) {
-        console.error('Falha ao carregar o cardápio:', respCategorias.error || respProdutos.error)
-        if (primeiraVez) setEstado('erro')
-        return
-      }
-
-      setCategorias(respCategorias.data)
-      setProdutos(respProdutos.data)
-      // nao muda a categoria escolhida num recarregamento: tirar o
-      // cliente da categoria que ele estava vendo seria pior que
-      // mostrar um preco velho por alguns segundos
-      setCategoriaAtual((atual) => atual ?? respCategorias.data[0]?.id ?? null)
-      setEstado('pronto')
-    },
-    [loja.id],
-  )
-
-  useEffect(() => {
-    carregarCardapio({ primeiraVez: true })
-  }, [carregarCardapio])
-
-  // Tempo real: o dono toca em "Esgotado" no painel e o item apaga
-  // aqui na hora, mesmo com o cliente olhando a tela.
-  //
-  // Isso REDUZ a recusa no fim do pedido, nao elimina: se o item
-  // esgotar no mesmo segundo do envio, o servidor ainda recusa — e
-  // tem que recusar. Quem decide e o banco.
-  useEffect(() => {
-    let atraso = null
-
-    const canal = supabase
-      .channel(`cardapio-${loja.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'produtos',
-          // sem este filtro o totem reagiria a mudanca de outra loja:
-          // a leitura de cardapio e publica por decisao nossa
-          filter: `estabelecimento_id=eq.${loja.id}`,
-        },
-        () => {
-          clearTimeout(atraso)
-          atraso = setTimeout(carregarCardapio, 300)
-        },
-      )
-      .subscribe()
-
-    return () => {
-      clearTimeout(atraso)
-      supabase.removeChannel(canal)
-    }
-  }, [loja.id, carregarCardapio])
+  // null = ainda nao escolheu; cai na primeira categoria.
+  // Guardar a escolha aqui faz o cliente NAO ser jogado para outra
+  // categoria quando o cardapio se atualiza no meio da navegacao.
+  const [categoriaEscolhida, setCategoriaEscolhida] = useState(null)
+  const categoriaAtual = categoriaEscolhida ?? categorias[0]?.id ?? null
+  const setCategoriaAtual = setCategoriaEscolhida
 
   if (estado === 'carregando') {
     return <Recado texto="Carregando o cardápio..." corTexto={corTexto} corFundo={corFundo} />
@@ -136,7 +56,11 @@ export default function Cardapio({
     )
   }
 
-  const produtosDaCategoria = produtos.filter((p) => p.categoria_id === categoriaAtual)
+  // vendavel_sozinho: produto que so existe dentro de combo nao
+  // aparece avulso. Ele vem na lista porque o carrinho precisa dele.
+  const produtosDaCategoria = produtos.filter(
+    (p) => p.vendavel_sozinho && p.categoria_id === categoriaAtual,
+  )
   const itensNoCarrinho = carrinho.reduce((soma, item) => soma + item.quantidade, 0)
 
   return (

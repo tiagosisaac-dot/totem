@@ -8,10 +8,11 @@
 // Etapas: inicial -> cardapio -> produto -> carrinho -> mesa
 // ============================================================
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useInatividade } from '../lib/useInatividade.js'
+import { useCardapio, motivoEsgotado } from '../lib/useCardapio.js'
 import Cardapio from '../componentes/Cardapio.jsx'
 import Produto from '../componentes/Produto.jsx'
 import Carrinho from '../componentes/Carrinho.jsx'
@@ -59,6 +60,25 @@ export default function Totem() {
     setEnviando(false)
     setEtapa('carrinho')
   }
+
+  const cardapio = useCardapio(loja)
+
+  // Marca as linhas do carrinho AO VIVO, sem esperar a recusa do
+  // servidor: se o dono esgota um item agora, o cliente ve na hora.
+  //
+  // Nunca remover sozinho. O cliente veria o total mudar sem entender
+  // por que, ou nem notaria a falta e descobriria no caixa — e
+  // culparia a loja, não o sistema. Ele remove, explicitamente.
+  const carrinhoMarcado = useMemo(
+    () =>
+      carrinho.map((item) => {
+        const motivo = motivoEsgotado(item, cardapio.porId)
+        return motivo ? { ...item, esgotado: true, motivo } : item
+      }),
+    [carrinho, cardapio.porId],
+  )
+
+  const temEsgotado = carrinhoMarcado.some((item) => item.esgotado)
 
   const inatividade = useInatividade({
     ativo: etapa !== 'inicial' && !enviando,
@@ -179,22 +199,21 @@ export default function Totem() {
   if (etapa === 'carrinho') {
     return comAviso(
       <Carrinho
-        carrinho={carrinho}
+        carrinho={carrinhoMarcado}
         corTexto={corTexto}
         corFundo={corFundo}
-        avisoEsgotado={avisoEsgotado}
+        // frase do servidor quando houve recusa; senao a que vale para
+        // o item que acabou de esgotar na tela
+        avisoEsgotado={
+          avisoEsgotado ?? (temEsgotado ? 'Um item do seu pedido esgotou.' : null)
+        }
         aoVoltar={() => {
           setAvisoEsgotado(null)
           setEtapa('cardapio')
         }}
         aoRemover={(indice) => {
-          setCarrinho((atual) => {
-            const restante = atual.filter((_, i) => i !== indice)
-            // o aviso do topo so sai quando NENHUMA linha estiver
-            // marcada: com duas esgotadas, tirar uma nao resolveu
-            if (!restante.some((item) => item.esgotado)) setAvisoEsgotado(null)
-            return restante
-          })
+          setCarrinho((atual) => atual.filter((_, i) => i !== indice))
+          setAvisoEsgotado(null)
         }}
         aoFinalizar={() => setEtapa('mesa')}
       />,
@@ -220,6 +239,9 @@ export default function Totem() {
     return comAviso(
       <Cardapio
         loja={loja}
+        estado={cardapio.estado}
+        categorias={cardapio.categorias}
+        produtos={cardapio.produtos}
         corTexto={corTexto}
         corFundo={corFundo}
         carrinho={carrinho}
