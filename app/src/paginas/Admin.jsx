@@ -188,36 +188,46 @@ export default function Admin() {
 }
 
 // ------------------------------------------------------------
+// Uma linha do cardápio.
+//
+// O preço NÃO é um campo editável esperando um toque: é texto, com
+// um botão "Alterar preço" ao lado. Sem tocar nesse botão não existe
+// como mudar valor sem querer — e para quem não tem prática, o passo
+// a passo fica óbvio: aperta Alterar, digita, aperta Salvar.
+//
+// O campo abre VAZIO, com o preço atual visível do lado: assim o
+// dono não precisa apagar nada, só digitar o valor novo.
+// ------------------------------------------------------------
 function LinhaProduto({ produto, corTexto, corFundo, aoSalvar }) {
-  // null = o dono nem tocou no campo.  '' = tocou e apagou tudo.
-  //
-  // Precisam ser sinais DIFERENTES. Usar vazio para as duas coisas
-  // faz o campo se restaurar sozinho quando o dono apaga o último
-  // dígito — e parece que o primeiro número não apaga.
-  const [rascunho, setRascunho] = useState(null)
+  const [alterando, setAlterando] = useState(false)
+  const [rascunho, setRascunho] = useState('')
   const [salvando, setSalvando] = useState(false)
 
-  const precoSalvo = Number(produto.preco).toFixed(2)
-  const editando = rascunho !== null
-  const mostrado = editando ? rascunho : precoSalvo
+  const precoSalvo = Number(produto.preco)
 
   // aceita vírgula: é como se escreve preço em português
-  const digitado = mostrado.replace(',', '.')
+  const digitado = rascunho.replace(',', '.')
   const valorNovo = Number(digitado)
   const valido = digitado.trim() !== '' && Number.isFinite(valorNovo) && valorNovo >= 0
-  const invalido = editando && rascunho.trim() !== '' && !valido
-  const mudou = valido && valorNovo !== Number(produto.preco)
+  const invalido = rascunho.trim() !== '' && !valido
+  const podeSalvar = valido && valorNovo !== precoSalvo
 
-  function desfazer() {
-    setRascunho(null)
+  function abrir() {
+    setRascunho('')
+    setAlterando(true)
+  }
+
+  function cancelar() {
+    setAlterando(false)
+    setRascunho('')
   }
 
   async function salvarPreco() {
-    if (!mudou) return
+    if (!podeSalvar) return
     setSalvando(true)
     const deuCerto = await aoSalvar(produto, { preco: valorNovo.toFixed(2) })
     setSalvando(false)
-    if (deuCerto) setRascunho(null)
+    if (deuCerto) cancelar()
   }
 
   return (
@@ -227,56 +237,63 @@ function LinhaProduto({ produto, corTexto, corFundo, aoSalvar }) {
     >
       <p className="min-w-0 flex-1 text-2xl font-bold">{produto.nome}</p>
 
-      {/* preço */}
-      <div className="flex items-center gap-2">
-        <span className="text-xl font-bold opacity-60">R$</span>
-        <input
-          inputMode="decimal"
-          value={mostrado}
-          onFocus={(e) => {
-            // Seleciona tudo ao tocar: quem não tem prática digita o
-            // valor novo por cima, em vez de apagar dígito por dígito.
-            // O texto do rascunho é igual ao que já estava na tela, então
-            // a seleção sobrevive à re-renderização.
-            if (rascunho === null) setRascunho(precoSalvo)
-            e.target.select()
-          }}
-          onChange={(e) => setRascunho(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') salvarPreco()
-            if (e.key === 'Escape') desfazer()
-          }}
-          className="min-h-[60px] w-32 rounded-xl border-4 px-3 text-2xl font-bold"
-          style={{ borderColor: mudou ? corTexto : `${corTexto}33`, color: corTexto }}
-          aria-label={`Preço de ${produto.nome}`}
-        />
-      </div>
+      {alterando ? (
+        <>
+          <span className="text-xl font-bold opacity-60">
+            atual {emReais(precoSalvo)} → novo
+          </span>
 
-      {/* só aparece quando o valor realmente mudou: toque acidental
-          no campo não pode virar reajuste de preço */}
-      {mudou && (
-        <button
-          onClick={salvarPreco}
-          disabled={salvando}
-          className="min-h-[60px] rounded-xl px-6 text-xl font-black disabled:opacity-50 active:enabled:scale-95"
-          style={{ backgroundColor: corTexto, color: corFundo }}
-        >
-          {salvando ? 'Salvando...' : `Salvar ${emReais(valorNovo)}`}
-        </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold opacity-60">R$</span>
+            <input
+              autoFocus
+              inputMode="decimal"
+              placeholder="0,00"
+              value={rascunho}
+              onChange={(e) => setRascunho(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') salvarPreco()
+                if (e.key === 'Escape') cancelar()
+              }}
+              className="min-h-[60px] w-32 rounded-xl border-4 px-3 text-2xl font-bold"
+              style={{ borderColor: corTexto, color: corTexto }}
+              aria-label={`Novo preço de ${produto.nome}`}
+            />
+          </div>
+
+          <button
+            onClick={salvarPreco}
+            disabled={!podeSalvar || salvando}
+            className="min-h-[60px] rounded-xl px-6 text-xl font-black disabled:opacity-40 active:enabled:scale-95"
+            style={{ backgroundColor: corTexto, color: corFundo }}
+          >
+            {salvando ? 'Salvando...' : 'Salvar'}
+          </button>
+
+          <button
+            onClick={cancelar}
+            disabled={salvando}
+            className="min-h-[60px] rounded-xl border-4 px-5 text-xl font-bold disabled:opacity-40 active:enabled:scale-95"
+            style={{ borderColor: `${corTexto}44` }}
+          >
+            Cancelar
+          </button>
+
+          {invalido && <span className="text-lg font-bold opacity-60">valor inválido</span>}
+        </>
+      ) : (
+        <>
+          <span className="text-2xl font-black">{emReais(precoSalvo)}</span>
+
+          <button
+            onClick={abrir}
+            className="min-h-[60px] rounded-xl border-4 px-5 text-xl font-bold active:scale-95"
+            style={{ borderColor: corTexto }}
+          >
+            Alterar preço
+          </button>
+        </>
       )}
-
-      {/* saída sem risco para quem se perdeu no meio da digitação */}
-      {editando && mostrado !== precoSalvo && !salvando && (
-        <button
-          onClick={desfazer}
-          className="min-h-[60px] rounded-xl border-4 px-5 text-xl font-bold active:scale-95"
-          style={{ borderColor: `${corTexto}44` }}
-        >
-          Desfazer
-        </button>
-      )}
-
-      {invalido && <span className="text-lg font-bold opacity-60">valor inválido</span>}
 
       {/* esgotar / reativar */}
       <button
