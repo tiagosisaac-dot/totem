@@ -15,6 +15,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Totem from './paginas/Totem.jsx'
 import Cozinha from './paginas/Cozinha.jsx'
 import Balcao from './paginas/Balcao.jsx'
+import Admin from './paginas/Admin.jsx'
 
 export default function App() {
   return (
@@ -23,19 +24,10 @@ export default function App() {
         <Route path="/:slug" element={<Totem />} />
         <Route path="/:slug/cozinha" element={<Cozinha />} />
         <Route path="/:slug/balcao" element={<Balcao />} />
-        <Route path="/:slug/admin" element={<EmConstrucao nome="Painel do dono" />} />
+        <Route path="/:slug/admin" element={<Admin />} />
         <Route path="*" element={<EnderecoInvalido />} />
       </Routes>
     </BrowserRouter>
-  )
-}
-
-function EmConstrucao({ nome }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-      <p className="text-4xl font-bold">{nome}</p>
-      <p className="text-2xl opacity-60">Ainda não construído.</p>
-    </div>
   )
 }
 

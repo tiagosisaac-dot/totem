@@ -1,24 +1,23 @@
 // ============================================================
 // PAINEL — o que a cozinha e o balcao compartilham
 //
-// As duas telas usam os mesmos dados (loja, acesso, pedidos com a
-// plaquinha fora) e o mesmo tempo real. O que muda entre elas e
-// apenas O QUE cada uma mostra e qual botao oferece.
+// Em cima de useLojaLogada (quem esta logado e em qual loja), este
+// hook acrescenta o que so essas duas telas precisam: os pedidos
+// com a plaquinha fora e o tempo real.
 //
-// Sem isso, a mesma logica ficaria copiada em dois arquivos — e
-// um dia alguem corrigiria so um dos dois.
+// O painel do dono NAO usa este hook: ele nao precisa de pedidos
+// nem de assinatura de tempo real.
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
-import { useSessao } from './sessao.js'
+import { useLojaLogada } from './useLojaLogada.js'
 
 export function usePainel(slug) {
-  const { sessao, carregando: carregandoSessao } = useSessao()
+  const base = useLojaLogada(slug)
+  const { loja, acesso } = base
 
-  const [loja, setLoja] = useState(null)
   const [totalPlaquinhas, setTotalPlaquinhas] = useState(null)
-  const [acesso, setAcesso] = useState('verificando')
   const [pedidos, setPedidos] = useState([])
   const [agora, setAgora] = useState(Date.now())
 
@@ -29,53 +28,22 @@ export function usePainel(slug) {
   }, [])
 
   useEffect(() => {
-    let cancelado = false
-
-    async function carregarLoja() {
-      const { data } = await supabase
-        .from('estabelecimentos')
-        .select('id, nome, fuso, cor_primaria, cor_secundaria')
-        .eq('slug', slug)
-        .maybeSingle()
-
-      if (cancelado || !data) return
-      setLoja(data)
-
-      const { count } = await supabase
-        .from('mesas')
-        .select('numero', { count: 'exact', head: true })
-        .eq('estabelecimento_id', data.id)
-        .eq('ativa', true)
-
-      if (!cancelado) setTotalPlaquinhas(count)
-    }
-
-    carregarLoja()
-    return () => {
-      cancelado = true
-    }
-  }, [slug])
-
-  // A pessoa logada pertence A ESTA loja?
-  // Sem conferir, o painel de outra loja abriria vazio por causa das
-  // policies e pareceria bug de codigo (REGRA 6).
-  useEffect(() => {
-    if (!sessao || !loja) return
+    if (!loja) return
     let cancelado = false
 
     supabase
-      .from('perfis')
-      .select('estabelecimento_id')
-      .eq('user_id', sessao.user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelado) setAcesso(data?.estabelecimento_id === loja.id ? 'liberado' : 'negado')
+      .from('mesas')
+      .select('numero', { count: 'exact', head: true })
+      .eq('estabelecimento_id', loja.id)
+      .eq('ativa', true)
+      .then(({ count }) => {
+        if (!cancelado) setTotalPlaquinhas(count)
       })
 
     return () => {
       cancelado = true
     }
-  }, [sessao, loja])
+  }, [loja])
 
   const carregarPedidos = useCallback(async () => {
     if (!loja) return
@@ -156,16 +124,5 @@ export function usePainel(slug) {
     [carregarPedidos],
   )
 
-  return {
-    sessao,
-    carregandoSessao,
-    loja,
-    totalPlaquinhas,
-    acesso,
-    pedidos,
-    agora,
-    atualizar,
-    corTexto: loja?.cor_primaria || '#111111',
-    corFundo: loja?.cor_secundaria || '#F5F5F5',
-  }
+  return { ...base, totalPlaquinhas, pedidos, agora, atualizar }
 }
