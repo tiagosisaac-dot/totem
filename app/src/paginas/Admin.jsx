@@ -189,23 +189,35 @@ export default function Admin() {
 
 // ------------------------------------------------------------
 function LinhaProduto({ produto, corTexto, corFundo, aoSalvar }) {
-  const [precoTexto, setPrecoTexto] = useState('')
+  // null = o dono nem tocou no campo.  '' = tocou e apagou tudo.
+  //
+  // Precisam ser sinais DIFERENTES. Usar vazio para as duas coisas
+  // faz o campo se restaurar sozinho quando o dono apaga o último
+  // dígito — e parece que o primeiro número não apaga.
+  const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
 
-  // valor digitado, normalizado: aceita vírgula (é como se escreve
-  // preço em português) e recusa texto que não é número
-  const digitado = precoTexto.replace(',', '.')
+  const precoSalvo = Number(produto.preco).toFixed(2)
+  const editando = rascunho !== null
+  const mostrado = editando ? rascunho : precoSalvo
+
+  // aceita vírgula: é como se escreve preço em português
+  const digitado = mostrado.replace(',', '.')
   const valorNovo = Number(digitado)
-  const editando = precoTexto !== ''
-  const valido = editando && digitado !== '' && Number.isFinite(valorNovo) && valorNovo >= 0
+  const valido = digitado.trim() !== '' && Number.isFinite(valorNovo) && valorNovo >= 0
+  const invalido = editando && rascunho.trim() !== '' && !valido
   const mudou = valido && valorNovo !== Number(produto.preco)
+
+  function desfazer() {
+    setRascunho(null)
+  }
 
   async function salvarPreco() {
     if (!mudou) return
     setSalvando(true)
     const deuCerto = await aoSalvar(produto, { preco: valorNovo.toFixed(2) })
     setSalvando(false)
-    if (deuCerto) setPrecoTexto('')
+    if (deuCerto) setRascunho(null)
   }
 
   return (
@@ -220,9 +232,20 @@ function LinhaProduto({ produto, corTexto, corFundo, aoSalvar }) {
         <span className="text-xl font-bold opacity-60">R$</span>
         <input
           inputMode="decimal"
-          value={editando ? precoTexto : Number(produto.preco).toFixed(2)}
-          onFocus={() => setPrecoTexto(Number(produto.preco).toFixed(2))}
-          onChange={(e) => setPrecoTexto(e.target.value)}
+          value={mostrado}
+          onFocus={(e) => {
+            // Seleciona tudo ao tocar: quem não tem prática digita o
+            // valor novo por cima, em vez de apagar dígito por dígito.
+            // O texto do rascunho é igual ao que já estava na tela, então
+            // a seleção sobrevive à re-renderização.
+            if (rascunho === null) setRascunho(precoSalvo)
+            e.target.select()
+          }}
+          onChange={(e) => setRascunho(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') salvarPreco()
+            if (e.key === 'Escape') desfazer()
+          }}
           className="min-h-[60px] w-32 rounded-xl border-4 px-3 text-2xl font-bold"
           style={{ borderColor: mudou ? corTexto : `${corTexto}33`, color: corTexto }}
           aria-label={`Preço de ${produto.nome}`}
@@ -242,7 +265,18 @@ function LinhaProduto({ produto, corTexto, corFundo, aoSalvar }) {
         </button>
       )}
 
-      {editando && !valido && <span className="text-lg font-bold opacity-60">valor inválido</span>}
+      {/* saída sem risco para quem se perdeu no meio da digitação */}
+      {editando && mostrado !== precoSalvo && !salvando && (
+        <button
+          onClick={desfazer}
+          className="min-h-[60px] rounded-xl border-4 px-5 text-xl font-bold active:scale-95"
+          style={{ borderColor: `${corTexto}44` }}
+        >
+          Desfazer
+        </button>
+      )}
+
+      {invalido && <span className="text-lg font-bold opacity-60">valor inválido</span>}
 
       {/* esgotar / reativar */}
       <button
