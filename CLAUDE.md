@@ -207,6 +207,15 @@ sumindo até o totem travar
 * Sem `service\_role key` no frontend, jamais. Só em Edge Function
 * **Rodar o projeto** (a partir da raiz do repositório, não da pasta pessoal):
 `npm --prefix app run dev` → `http://localhost:5173/adoravelburguer`
+* **Repositório:** `github.com/tiagosisaac-dot/totem` (privado), branch `master`
+* **Produção:** `https://totem-vert.vercel.app/adoravelburguer`.
+**Deploy é automático:** todo `git push` para `master` publica. Não existe comando
+de deploy — o que sobe é o que está no GitHub
+* **As chaves do Supabase em produção vivem no painel da Vercel**, não no
+repositório. `app/.env.local` é só da máquina do Isaac. Na Vercel o projeto tem
+**Root Directory = `app`** (sem isso o build falha sem explicar a causa) e
+`app/vercel.json` reescreve as rotas — sem ele, abrir `/:slug/cozinha` direto
+daria "página não encontrada"
 * **Publicar Edge Function:** `npx --yes supabase@latest functions deploy <nome>
 --project-ref mpcrwhaqrismnhblgvij`. Não precisa de `supabase link` nem de Docker
 (o aviso de Docker no deploy é irrelevante)
