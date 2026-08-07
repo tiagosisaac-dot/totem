@@ -109,6 +109,32 @@ está comentado no fim daquele arquivo. As 40 mesas são reais e ficam.
 
 \---
 
+## Acessos e ambientes
+
+**Supabase (dev):** projeto `mpcrwhaqrismnhblgvij` →
+`https://mpcrwhaqrismnhblgvij.supabase.co`. A chave `anon` fica em
+`app/.env.local` (fora do controle de versão) e no painel da Vercel.
+A `service\_role` só existe dentro da Edge Function — nunca no frontend.
+
+**Estabelecimento piloto:** Adorável Burguer, slug `adoravelburguer`,
+id `0d8ce944-a60e-469f-8dd5-622595fcab88`.
+
+**Logins da equipe (ambiente dev).** As senhas são só do Isaac; não estão aqui e
+não devem estar:
+
+|Usuário|Papel|Acessa|
+|-|-|-|
+|`cozinha@adoravelburguer.com.br`|`cozinha`|`/cozinha` e `/balcao`|
+|`dono@adoravelburguer.com.br`|`dono`|`/admin`|
+
+> \*\*O Claude não consegue testar tela com login.\*\* Ele não tem as senhas, de
+> propósito. Em tudo que exige login: verificar o que der sem entrar (compila,
+> a tela de login aparece, a lógica está correta), e entregar ao Isaac um roteiro
+> de teste explícito, dizendo **o que não foi verificado**. Não afirmar que
+> funciona sem ter visto funcionando.
+
+\---
+
 ## Estrutura do banco
 
 **Tabelas:**
