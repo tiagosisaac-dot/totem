@@ -230,7 +230,10 @@ export default function NumeroMesa({
           transbordar para os DOIS lados quando a tela e baixa: some
           por cima do cabecalho e por baixo do botao, sem alcance. */}
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
-        <div className="flex min-h-full flex-col items-center justify-center gap-[2vh] p-6">
+        {/* Margens menores em tela estreita. Economizar aqui, em vez de
+            encolher as teclas, mantem o tablet — que e o alvo — com
+            alvo de toque grande. */}
+        <div className="flex min-h-full flex-col items-center justify-center gap-[1vh] p-3 sm:gap-[2vh] sm:p-6">
           {erro ? (
             <p
               className="max-w-3xl rounded-2xl px-8 py-5 text-center text-3xl font-bold"
@@ -248,7 +251,7 @@ export default function NumeroMesa({
             {digitado || <span className="opacity-25">—</span>}
           </p>
 
-          <div className="grid grid-cols-3 gap-[1.5vh]">
+          <div className="grid grid-cols-3 gap-2 sm:gap-[1.5vh]">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((numero) => (
               <Tecla key={numero} corTexto={corTexto} aoTocar={() => digitar(String(numero))}>
                 {numero}

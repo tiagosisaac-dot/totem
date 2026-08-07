@@ -66,20 +66,23 @@ export default function Cardapio({
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: corFundo, color: corTexto }}>
       {/* barra de cima */}
-      <header className="flex items-center gap-4 border-b-2 px-6 py-4" style={{ borderColor: `${corTexto}22` }}>
+      <header
+        className="flex flex-wrap items-center gap-3 border-b-2 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4"
+        style={{ borderColor: `${corTexto}22` }}
+      >
         <button
           onClick={aoVoltar}
-          className="min-h-[60px] rounded-xl border-4 px-6 text-2xl font-bold active:scale-95"
+          className="min-h-[60px] rounded-xl border-4 px-5 text-xl font-bold active:scale-95 sm:px-6 sm:text-2xl"
           style={{ borderColor: corTexto }}
         >
           ← Início
         </button>
-        <h1 className="text-3xl font-black">{loja.nome}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-black sm:text-3xl">{loja.nome}</h1>
 
         {itensNoCarrinho > 0 && (
           <button
             onClick={aoVerPedido}
-            className="ml-auto min-h-[60px] rounded-2xl px-6 py-3 text-2xl font-black active:scale-95"
+            className="min-h-[60px] rounded-2xl px-5 py-3 text-xl font-black active:scale-95 sm:px-6 sm:text-2xl"
             style={{ backgroundColor: corTexto, color: corFundo }}
           >
             Ver pedido ({itensNoCarrinho})
@@ -87,17 +90,23 @@ export default function Cardapio({
         )}
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        {/* categorias */}
-        <nav className="w-72 shrink-0 overflow-y-auto border-r-2 p-4" style={{ borderColor: `${corTexto}22` }}>
-          <ul className="flex flex-col gap-3">
+      {/* Em tela estreita as categorias viram uma faixa em cima, que
+          rola de lado. Com a lista fixa de 288px na lateral, um celular
+          de 360px sobrava ~70px para o produto e o nome virava uma
+          coluna de letras. */}
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <nav
+          className="shrink-0 overflow-auto border-b-2 p-3 md:w-72 md:border-b-0 md:border-r-2 md:p-4"
+          style={{ borderColor: `${corTexto}22`, overscrollBehavior: 'contain' }}
+        >
+          <ul className="flex gap-3 md:flex-col">
             {categorias.map((categoria) => {
               const ativa = categoria.id === categoriaAtual
               return (
-                <li key={categoria.id}>
+                <li key={categoria.id} className="shrink-0 md:shrink">
                   <button
                     onClick={() => setCategoriaAtual(categoria.id)}
-                    className="min-h-[72px] w-full rounded-2xl px-4 py-3 text-left text-2xl font-bold active:scale-95"
+                    className="min-h-[60px] w-full whitespace-nowrap rounded-2xl px-4 py-3 text-xl font-bold active:scale-95 md:min-h-[72px] md:whitespace-normal md:text-left md:text-2xl"
                     style={
                       ativa
                         ? { backgroundColor: corTexto, color: corFundo }
@@ -113,11 +122,14 @@ export default function Cardapio({
         </nav>
 
         {/* produtos */}
-        <main className="min-h-0 flex-1 overflow-y-auto p-6" style={{ overscrollBehavior: 'contain' }}>
+        <main
+          className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
+          style={{ overscrollBehavior: 'contain' }}
+        >
           {produtosDaCategoria.length === 0 ? (
             <p className="mt-12 text-center text-3xl opacity-60">Nada nesta categoria por enquanto.</p>
           ) : (
-            <ul className="grid grid-cols-2 gap-6 xl:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
               {produtosDaCategoria.map((produto) => (
                 <li key={produto.id}>
                   <CartaoProduto

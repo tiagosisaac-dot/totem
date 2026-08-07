@@ -63,7 +63,7 @@ export default function Balcao() {
         {prontos.length > 0 && (
           <section className="mb-8">
             <h2 className="mb-3 text-2xl font-black">Prontos para levar ({prontos.length})</h2>
-            <ul className="grid grid-cols-2 gap-5 xl:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
               {prontos.map((pedido) => (
                 <CartaoPedido
                   key={pedido.id}

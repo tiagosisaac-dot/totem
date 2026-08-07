@@ -196,18 +196,24 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: corFundo, color: corTexto }}>
-      <header className="flex items-center gap-4 border-b-2 px-6 py-4" style={{ borderColor: borda }}>
+      <header
+        className="flex items-center gap-3 border-b-2 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4"
+        style={{ borderColor: borda }}
+      >
         <button
           onClick={aoVoltar}
-          className="min-h-[60px] rounded-xl border-4 px-6 text-2xl font-bold active:scale-95"
+          className="min-h-[60px] shrink-0 rounded-xl border-4 px-5 text-xl font-bold active:scale-95 sm:px-6 sm:text-2xl"
           style={{ borderColor: corTexto }}
         >
           ← Voltar
         </button>
-        <h1 className="truncate text-3xl font-black">{produto.nome}</h1>
+        <h1 className="min-w-0 truncate text-2xl font-black sm:text-3xl">{produto.nome}</h1>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-6" style={{ overscrollBehavior: 'contain' }}>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
+        style={{ overscrollBehavior: 'contain' }}
+      >
         <div className="mb-8">
           {produto.descricao && <p className="text-2xl opacity-70">{produto.descricao}</p>}
           <p className="mt-2 text-3xl font-black">{emReais(produto.preco)}</p>
@@ -276,9 +282,14 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
         ))}
       </div>
 
-      {/* barra de baixo: quantidade e confirmacao */}
-      <footer className="flex items-center gap-6 border-t-2 px-6 py-4" style={{ borderColor: borda }}>
-        <div className="flex items-center gap-3">
+      {/* Barra de baixo: quantidade e confirmacao.
+          Em tela estreita eles empilham — lado a lado, o botao ficava
+          com uma palavra por linha e o texto virava um bloco ilegivel. */}
+      <footer
+        className="flex flex-col gap-3 border-t-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-6 sm:py-4"
+        style={{ borderColor: borda }}
+      >
+        <div className="flex items-center justify-center gap-3">
           <BotaoQtd
             rotulo="−"
             desabilitado={quantidade <= 1}
@@ -297,7 +308,7 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
         <button
           onClick={confirmar}
           disabled={pendencia !== null}
-          className="flex min-h-[76px] flex-1 items-center justify-between rounded-2xl px-8 text-3xl font-black disabled:opacity-40 active:enabled:scale-95"
+          className="flex min-h-[76px] flex-1 items-center justify-center gap-3 rounded-2xl px-5 text-2xl font-black disabled:opacity-40 active:enabled:scale-95 sm:justify-between sm:px-8 sm:text-3xl"
           style={{ backgroundColor: corTexto, color: corFundo }}
         >
           <span>{pendencia ?? 'Adicionar'}</span>
@@ -324,7 +335,7 @@ function Bloco({ titulo, obrigatorio, limite, corTexto, corFundo, children }) {
         )}
         {limite > 1 && <span className="text-xl opacity-60">escolha até {limite}</span>}
       </div>
-      <ul className="grid grid-cols-2 gap-4 xl:grid-cols-3">{children}</ul>
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">{children}</ul>
     </section>
   )
 }

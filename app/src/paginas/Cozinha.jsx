@@ -37,7 +37,7 @@ export default function Cozinha() {
         {produzindo.length === 0 ? (
           <p className="mt-16 text-center text-4xl opacity-50">Nenhum pedido para produzir.</p>
         ) : (
-          <ul className="grid grid-cols-2 gap-5 xl:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
             {produzindo.map((pedido) => (
               <CartaoPedido
                 key={pedido.id}

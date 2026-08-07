@@ -27,15 +27,18 @@ export default function Carrinho({
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: corFundo, color: corTexto }}>
-      <header className="flex items-center gap-4 border-b-2 px-6 py-4" style={{ borderColor: borda }}>
+      <header
+        className="flex flex-wrap items-center gap-3 border-b-2 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4"
+        style={{ borderColor: borda }}
+      >
         <button
           onClick={aoVoltar}
-          className="min-h-[60px] rounded-xl border-4 px-6 text-2xl font-bold active:scale-95"
+          className="min-h-[60px] rounded-xl border-4 px-5 text-xl font-bold active:scale-95 sm:px-6 sm:text-2xl"
           style={{ borderColor: corTexto }}
         >
           ← Adicionar mais
         </button>
-        <h1 className="text-3xl font-black">Seu pedido</h1>
+        <h1 className="text-2xl font-black sm:text-3xl">Seu pedido</h1>
       </header>
 
       {avisoEsgotado && (
@@ -56,11 +59,11 @@ export default function Carrinho({
             {carrinho.map((item, indice) => (
               <li
                 key={indice}
-                className="flex items-start gap-4 rounded-3xl border-4 p-5"
+                className="flex flex-wrap items-start gap-3 rounded-3xl border-4 p-4 sm:gap-4 sm:p-5"
                 style={{ borderColor: item.esgotado ? ALERTA : borda }}
               >
                 <span
-                  className="shrink-0 rounded-xl px-4 py-2 text-3xl font-black"
+                  className="shrink-0 rounded-xl px-3 py-2 text-2xl font-black sm:px-4 sm:text-3xl"
                   style={
                     item.esgotado
                       ? { backgroundColor: ALERTA, color: '#FFFFFF' }
@@ -70,8 +73,8 @@ export default function Carrinho({
                   {item.quantidade}×
                 </span>
 
-                <div className="min-w-0 flex-1">
-                  <p className="text-3xl font-bold">{item.produto.nome}</p>
+                <div className="min-w-[8rem] flex-1">
+                  <p className="text-2xl font-bold sm:text-3xl">{item.produto.nome}</p>
                   {item.resumo.length > 0 && (
                     <p className="mt-1 text-xl opacity-70">{item.resumo.join(' • ')}</p>
                   )}
@@ -84,7 +87,9 @@ export default function Carrinho({
                   )}
                 </div>
 
-                <span className="shrink-0 text-3xl font-black">{emReais(item.totalMostrado)}</span>
+                <span className="ml-auto shrink-0 text-2xl font-black sm:text-3xl">
+                  {emReais(item.totalMostrado)}
+                </span>
 
                 {/* alvo de toque grande e afastado do resto: remover
                     por engano no fim do pedido e irritante.
@@ -93,7 +98,7 @@ export default function Carrinho({
                 <button
                   onClick={() => aoRemover(indice)}
                   aria-label={`Remover ${item.produto.nome}`}
-                  className="ml-2 h-[64px] w-[64px] shrink-0 rounded-2xl border-4 text-3xl font-black active:scale-95"
+                  className="h-[64px] w-[64px] shrink-0 rounded-2xl border-4 text-3xl font-black active:scale-95 sm:ml-2"
                   style={
                     item.esgotado
                       ? { backgroundColor: ALERTA, borderColor: ALERTA, color: '#FFFFFF' }
@@ -108,16 +113,19 @@ export default function Carrinho({
         )}
       </div>
 
-      <footer className="flex items-center gap-6 border-t-2 px-6 py-4" style={{ borderColor: borda }}>
-        <div className="shrink-0">
+      <footer
+        className="flex flex-col gap-3 border-t-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-6 sm:py-4"
+        style={{ borderColor: borda }}
+      >
+        <div className="flex shrink-0 items-baseline gap-3 sm:block">
           <p className="text-xl opacity-60">Total</p>
-          <p className="text-4xl font-black">{emReais(total)}</p>
+          <p className="text-3xl font-black sm:text-4xl">{emReais(total)}</p>
         </div>
 
         <button
           onClick={aoFinalizar}
           disabled={carrinho.length === 0 || temEsgotado}
-          className="min-h-[76px] flex-1 rounded-2xl px-8 text-3xl font-black disabled:opacity-40 active:enabled:scale-95"
+          className="min-h-[76px] flex-1 rounded-2xl px-5 text-2xl font-black disabled:opacity-40 active:enabled:scale-95 sm:px-8 sm:text-3xl"
           style={{ backgroundColor: corTexto, color: corFundo }}
         >
           Finalizar pedido
