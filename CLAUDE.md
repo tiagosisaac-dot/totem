@@ -101,7 +101,8 @@ uso e item esgotado
 por Isaac no SQL Editor do painel; não usamos `supabase db push`. Ao criar uma
 migration nova: escrever o arquivo, pedir para ele rodar, **e só publicar Edge
 Function que dependa dela depois** — senão o totem quebra no intervalo.
-Já rodadas: 002 (plaquinha), 003 (devolução), 004 (cardápio ao vivo).
+Já rodadas: 002 (plaquinha), 003 (devolução), 004 (cardápio ao vivo),
+005 (só dono edita cardápio — confirmado em 15/08/2026 conferindo `pg_policies`).
 
 **Cardápio de teste:** ids que começam com `00000000-0000-4000-8000-` são falsos
 (`supabase/seed\_teste\_dev.sql`). Apagar quando o cardápio real entrar; o comando
@@ -256,10 +257,9 @@ antiga. Não voltar. Reavaliar quando sair release com o patch
 
 A Fase 1 está fechada. Na fila, em ordem de risco:
 
-1. **Restringir alteração de preço ao dono.** Hoje a policy `prod\_dono` permite
-escrita a qualquer usuário do estabelecimento — inclusive o login da cozinha. O
-painel confere o papel na tela, mas isso é conveniência, não segurança. Preço é
-dinheiro; fechar no banco
+1. ~~Restringir alteração de preço ao dono~~ — **feito** (migração 005, confirmada
+15/08/2026: só `dono` tem policy de insert/update/delete em produtos, categorias,
+grupos\_opcoes e opcoes; leitura continua pública)
 2. **Cardápio real do Adorável Burguer**, e apagar o de teste
 3. **Deploy na Vercel** com as variáveis de ambiente
 4. **Heartbeat** — Isaac saber que um totem caiu antes do dono ligar
