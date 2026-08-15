@@ -8,10 +8,31 @@
 import Login from './Login.jsx'
 import { sair } from '../lib/sessao.js'
 
-// Unica cor do projeto que nao vem do banco. Nao e identidade
-// visual da loja, e sinal de atencao numa tela interna — uma loja
+// Unicas cores do projeto que nao vem do banco. Nao sao identidade
+// visual da loja, sao sinal de atencao numa tela interna — uma loja
 // de tema vermelho nao pode fazer o alerta desaparecer.
+//
+// A cor do texto vem junto e e fixa: o contraste tem que valer em
+// loja de tema claro e de tema escuro. Herdar a cor do banco aqui
+// daria numero amarelo em cima de amarelo em alguma loja futura.
 export const ALERTA = '#C81E1E'
+export const ATENCAO = '#F59E0B'
+
+const SOBRE_ALERTA = '#FFFFFF'
+const SOBRE_ATENCAO = '#111111'
+
+// Minutos de espera a partir dos quais o pedido muda de cor na
+// cozinha. Sao dois porque um so nao avisa: o amarelo existe para
+// dar tempo de reagir ANTES de virar reclamacao no salao.
+export const MIN_ATENCAO = 4
+export const MIN_ALERTA = 7
+
+// Devolve a cor do atraso, ou null enquanto esta no tempo normal.
+export function corDoAtraso(minutos) {
+  if (minutos >= MIN_ALERTA) return { fundo: ALERTA, texto: SOBRE_ALERTA }
+  if (minutos >= MIN_ATENCAO) return { fundo: ATENCAO, texto: SOBRE_ATENCAO }
+  return null
+}
 
 // ------------------------------------------------------------
 // Devolve a tela que deve aparecer NO LUGAR do painel, ou null se
@@ -69,8 +90,29 @@ export function Cabecalho({ titulo, loja, corTexto, children }) {
 }
 
 // ------------------------------------------------------------
-export function CartaoPedido({ pedido, agora, corTexto, corFundo, destacado, rotulo, aoTocar }) {
+// UMA LINHA POR PEDIDO
+//
+// Fila de verdade: o mais antigo em cima, o novo entra embaixo.
+// Em grade lado a lado, "quem chegou primeiro" depende de saber
+// que se le da esquerda para a direita e depois desce — em cozinha
+// cheia, ninguem faz essa conta e o pedido velho fica para tras.
+//
+// 'atrasoVisivel' liga a cor do tempo. So a cozinha usa: no balcao
+// o prato ja passou pelo preparo, todo pedido estaria vermelho, e
+// tela toda vermelha ensina a equipe a ignorar vermelho.
+// ------------------------------------------------------------
+export function LinhaPedido({
+  pedido,
+  agora,
+  corTexto,
+  corFundo,
+  destacado,
+  atrasoVisivel,
+  rotulo,
+  aoTocar,
+}) {
   const minutos = Math.max(0, Math.floor((agora - new Date(pedido.criado_em).getTime()) / 60000))
+  const atraso = atrasoVisivel ? corDoAtraso(minutos) : null
 
   // itens do combo aparecem embaixo do combo, nao soltos na lista
   const principais = pedido.pedido_itens.filter((i) => !i.combo_pai_id)
@@ -79,32 +121,22 @@ export function CartaoPedido({ pedido, agora, corTexto, corFundo, destacado, rot
   return (
     <li>
       <article
-        className="flex h-full flex-col gap-3 rounded-3xl border-4 p-4"
-        style={{ borderColor: destacado ? corTexto : `${corTexto}33` }}
+        className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-3xl border-4 p-4"
+        style={{
+          borderColor: atraso?.fundo ?? (destacado ? corTexto : `${corTexto}33`),
+        }}
       >
-        <div className="flex items-start gap-4">
-          <div
-            className="rounded-2xl px-5 py-2 text-center leading-none"
-            style={{ backgroundColor: corTexto, color: corFundo }}
-          >
-            <p className="text-lg font-bold opacity-80">MESA</p>
-            <p className="text-7xl font-black">{pedido.mesa_numero}</p>
-          </div>
-          <p className="ml-auto text-2xl font-bold">{minutos} min</p>
+        <div
+          className="rounded-2xl px-5 py-2 text-center leading-none"
+          style={{ backgroundColor: corTexto, color: corFundo }}
+        >
+          <p className="text-lg font-bold opacity-80">MESA</p>
+          <p className="text-6xl font-black">{pedido.mesa_numero}</p>
         </div>
 
-        {/* alguem tentou usar este numero com a plaquinha ainda fora:
-            ou erro de digitacao, ou a plaquinha voltou sem ninguem marcar */}
-        {pedido.alerta_reuso_em && (
-          <p
-            className="rounded-xl px-4 py-3 text-lg font-bold text-white"
-            style={{ backgroundColor: ALERTA }}
-          >
-            Outro cliente tentou usar esta mesa. Confira a plaquinha.
-          </p>
-        )}
-
-        <ul className="flex flex-col gap-2">
+        {/* min-w-0 deixa o nome do item quebrar em vez de empurrar
+            o botao para fora da tela num tablet estreito */}
+        <ul className="flex min-w-0 flex-1 basis-64 flex-col gap-2">
           {principais.map((item) => (
             <li key={item.id}>
               <p className="text-2xl font-bold leading-tight">
@@ -124,9 +156,20 @@ export function CartaoPedido({ pedido, agora, corTexto, corFundo, destacado, rot
           ))}
         </ul>
 
+        <p
+          className="rounded-xl px-4 py-2 text-2xl font-black"
+          style={
+            atraso
+              ? { backgroundColor: atraso.fundo, color: atraso.texto }
+              : { border: `3px solid ${corTexto}33` }
+          }
+        >
+          {minutos} min
+        </p>
+
         <button
           onClick={aoTocar}
-          className="mt-auto min-h-[68px] rounded-2xl text-2xl font-black active:scale-95"
+          className="min-h-[68px] rounded-2xl px-8 text-2xl font-black active:scale-95"
           style={
             destacado
               ? { backgroundColor: corTexto, color: corFundo }
@@ -135,6 +178,18 @@ export function CartaoPedido({ pedido, agora, corTexto, corFundo, destacado, rot
         >
           {rotulo}
         </button>
+
+        {/* alguem tentou usar este numero com a plaquinha ainda fora:
+            ou erro de digitacao, ou a plaquinha voltou sem ninguem marcar.
+            basis-full joga para a linha de baixo, ocupando a largura toda */}
+        {pedido.alerta_reuso_em && (
+          <p
+            className="basis-full rounded-xl px-4 py-3 text-lg font-bold text-white"
+            style={{ backgroundColor: ALERTA }}
+          >
+            Outro cliente tentou usar esta mesa. Confira a plaquinha.
+          </p>
+        )}
       </article>
     </li>
   )

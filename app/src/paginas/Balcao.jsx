@@ -16,7 +16,7 @@
 
 import { useParams } from 'react-router-dom'
 import { usePainel } from '../lib/usePainel.js'
-import { ALERTA, bloqueioDoPainel, Cabecalho, CartaoPedido } from '../componentes/PainelComuns.jsx'
+import { ALERTA, bloqueioDoPainel, Cabecalho, LinhaPedido } from '../componentes/PainelComuns.jsx'
 
 // abaixo disso o contador fica vermelho: hora de sair recolhendo
 const POUCAS_PLAQUINHAS = 5
@@ -63,9 +63,9 @@ export default function Balcao() {
         {prontos.length > 0 && (
           <section className="mb-8">
             <h2 className="mb-3 text-2xl font-black">Prontos para levar ({prontos.length})</h2>
-            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+            <ul className="flex flex-col gap-4">
               {prontos.map((pedido) => (
-                <CartaoPedido
+                <LinhaPedido
                   key={pedido.id}
                   pedido={pedido}
                   agora={agora}

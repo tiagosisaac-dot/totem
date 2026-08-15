@@ -5,12 +5,16 @@
 // não volta na tela, e em casa cheia duas listas parecidas viram
 // pedido marcado errado.
 //
+// Fila em lista, um pedido por linha: o mais antigo em cima, o novo
+// entra embaixo. A cor do tempo (amarelo, depois vermelho) é o único
+// aviso de atraso — não existe alarme sonoro numa cozinha barulhenta.
+//
 // O que ficou pronto passa a existir no balcão (/:slug/balcao).
 // ============================================================
 
 import { useParams } from 'react-router-dom'
 import { usePainel } from '../lib/usePainel.js'
-import { bloqueioDoPainel, Cabecalho, CartaoPedido } from '../componentes/PainelComuns.jsx'
+import { bloqueioDoPainel, Cabecalho, LinhaPedido } from '../componentes/PainelComuns.jsx'
 
 export default function Cozinha() {
   const { slug } = useParams()
@@ -37,14 +41,15 @@ export default function Cozinha() {
         {produzindo.length === 0 ? (
           <p className="mt-16 text-center text-4xl opacity-50">Nenhum pedido para produzir.</p>
         ) : (
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+          <ul className="flex flex-col gap-4">
             {produzindo.map((pedido) => (
-              <CartaoPedido
+              <LinhaPedido
                 key={pedido.id}
                 pedido={pedido}
                 agora={agora}
                 corTexto={corTexto}
                 corFundo={corFundo}
+                atrasoVisivel
                 rotulo="Pronto"
                 aoTocar={() =>
                   atualizar(pedido, { status: 'pronto', pronto_em: new Date().toISOString() }, true)
