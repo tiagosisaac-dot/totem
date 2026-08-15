@@ -109,6 +109,15 @@ Já rodadas: 002 (plaquinha), 003 (devolução), 004 (cardápio ao vivo),
 (`supabase/seed\_teste\_dev.sql`). Apagar quando o cardápio real entrar; o comando
 está comentado no fim daquele arquivo. As 40 mesas são reais e ficam.
 
+**Cardápio real:** os 15 hambúrgueres entraram em 15/08/2026
+(`supabase/cardapio\_adoravelburguer.sql`, conferido pela API pública).
+Categoria `a1e7d3c4-5b62-4f18-9a03-7c2e8d1b4f60`. Junto veio o grupo
+"Turbine seu burger" (blend extra +R$ 9,50), ligado aos 15 de uma vez — é o
+mecanismo de grupo reutilizável, mudar o preço amanhã é uma linha só.
+**Ainda falta:** bebidas, porções e o combo (+R$ 15). O combo não é produto,
+é escolha ("transforme SEU burger"), então vira grupo reutilizável quando as
+bebidas existirem. **O cardápio de teste ainda está lá**, convivendo com o real.
+
 \---
 
 ## Acessos e ambientes
@@ -278,7 +287,9 @@ A Fase 1 está fechada. Na fila, em ordem de risco:
 1. ~~Restringir alteração de preço ao dono~~ — **feito** (migração 005, confirmada
 15/08/2026: só `dono` tem policy de insert/update/delete em produtos, categorias,
 grupos\_opcoes e opcoes; leitura continua pública)
-2. **Cardápio real do Adorável Burguer**, e apagar o de teste
+2. **Cardápio real do Adorável Burguer** — hambúrgueres **feitos** (15/08/2026).
+Falta o resto do impresso (bebidas, porções, combo) e **apagar o de teste**,
+depois que o Isaac conferir o real na tela
 3. **Deploy na Vercel** com as variáveis de ambiente
 4. ~~Heartbeat~~ — **feito** (migração 006 + Edge Functions `ping` e
 `verificar-heartbeat`, testadas de ponta a ponta em 15/08/2026).
