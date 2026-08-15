@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useInatividade } from '../lib/useInatividade.js'
+import { useHeartbeat } from '../lib/useHeartbeat.js'
 import { useCardapio, motivoEsgotado } from '../lib/useCardapio.js'
 import Cardapio from '../componentes/Cardapio.jsx'
 import Produto from '../componentes/Produto.jsx'
@@ -25,6 +26,7 @@ const SEGUNDOS_DO_AVISO = 15
 
 export default function Totem() {
   const { slug } = useParams()
+  useHeartbeat(slug)
   const [estado, setEstado] = useState('carregando')
   const [loja, setLoja] = useState(null)
   const [etapa, setEtapa] = useState('inicial')

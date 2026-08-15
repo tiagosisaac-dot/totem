@@ -102,7 +102,8 @@ por Isaac no SQL Editor do painel; não usamos `supabase db push`. Ao criar uma
 migration nova: escrever o arquivo, pedir para ele rodar, **e só publicar Edge
 Function que dependa dela depois** — senão o totem quebra no intervalo.
 Já rodadas: 002 (plaquinha), 003 (devolução), 004 (cardápio ao vivo),
-005 (só dono edita cardápio — confirmado em 15/08/2026 conferindo `pg_policies`).
+005 (só dono edita cardápio — confirmado em 15/08/2026 conferindo `pg_policies`),
+006 (heartbeat).
 
 **Cardápio de teste:** ids que começam com `00000000-0000-4000-8000-` são falsos
 (`supabase/seed\_teste\_dev.sql`). Apagar quando o cardápio real entrar; o comando
@@ -119,6 +120,11 @@ A `service\_role` só existe dentro da Edge Function — nunca no frontend.
 
 **Estabelecimento piloto:** Adorável Burguer, slug `adoravelburguer`,
 id `0d8ce944-a60e-469f-8dd5-622595fcab88`.
+
+**Avisos de sistema (heartbeat):** bot do Telegram `@Totem\_alerta\_bot`, avisa o
+Isaac. O token e o chat id vivem como **segredos da Edge Function** (`supabase
+secrets set`), nunca no repositório. Trocar para WhatsApp um dia = reescrever só
+`supabase/functions/\_shared/telegram.ts`; quem chama não muda.
 
 **Logins da equipe (ambiente dev).** As senhas são só do Isaac; não estão aqui e
 não devem estar:
@@ -169,6 +175,14 @@ O dono NUNCA recebe credencial do bucket — sobe pelo painel, o backend
 decide o caminho a partir do token dele.
 
 **Realtime ligado** em `pedidos` e `pedido\_itens` (para o KDS).
+
+**`totem\_heartbeat`** — uma linha por estabelecimento, com `ultimo\_ping` e
+`alertado\_em`. O totem manda sinal a cada minuto (`useHeartbeat` →
+Edge Function `ping`); `verificar-heartbeat` roda pelo `pg\_cron` e avisa o
+Isaac no Telegram quando passa de 3 minutos sem sinal. `alertado\_em` impede
+repetir o mesmo aviso; o `ping` zera o campo e manda o aviso de volta.
+Só alerta estabelecimento `ativo` e com `aceita\_pedidos` — dono que pausou o
+totem de propósito não é queda.
 
 \---
 
@@ -262,7 +276,11 @@ A Fase 1 está fechada. Na fila, em ordem de risco:
 grupos\_opcoes e opcoes; leitura continua pública)
 2. **Cardápio real do Adorável Burguer**, e apagar o de teste
 3. **Deploy na Vercel** com as variáveis de ambiente
-4. **Heartbeat** — Isaac saber que um totem caiu antes do dono ligar
+4. ~~Heartbeat~~ — **feito** (migração 006 + Edge Functions `ping` e
+`verificar-heartbeat`, testadas de ponta a ponta em 15/08/2026).
+**A conferência está PAUSADA** (`cron.unschedule`): sem tablet ligado o dia
+todo, "sem sinal" é o estado normal e o aviso vira ruído. **Religar junto com
+o piloto** — o comando está no fim de `migracao_006_heartbeat_totem.sql`
 5. Preencher os **A DEFINIR** do `docs/PRD.md`: mensalidade, quem paga o tablet,
 critério de sucesso do piloto, e como o dono chama o suporte no meio do movimento
 
