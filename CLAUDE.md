@@ -248,6 +248,10 @@ sumindo até o totem travar
 * Sem `service\_role key` no frontend, jamais. Só em Edge Function
 * **Rodar o projeto** (a partir da raiz do repositório, não da pasta pessoal):
 `npm --prefix app run dev` → `http://localhost:5173/adoravelburguer`
+* **Ver no tablet sem publicar:** `npm --prefix app run dev:rede` abre o servidor
+para os outros aparelhos do mesmo wi-fi → `http://<ip-da-máquina>:5173/adoravelburguer`.
+Layout de quiosque só revela o que está errado no aparelho de verdade.
+Só funciona com os dois na mesma rede — se o Isaac estiver fora de casa, não serve
 * **Repositório:** `github.com/tiagosisaac-dot/totem` (privado), branch `master`
 * **Produção:** `https://totem-vert.vercel.app/adoravelburguer`.
 **Deploy é automático:** todo `git push` para `master` publica. Não existe comando
