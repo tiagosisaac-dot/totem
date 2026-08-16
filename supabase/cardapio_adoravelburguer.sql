@@ -18,6 +18,12 @@
 --   Tropical — o impresso esqueceu de citar o hamburguer.
 --     Entra como blend angus 160g (padrao dos outros dessa faixa).
 --
+-- A pimenta do Mexicano e 🌶️ = U+1F336 SEGUIDO DE U+FE0F. Sem esse
+-- segundo caractere o desenho fica ambiguo e cada aparelho escolhe:
+-- na cozinha saiu em preto e branco. Emoji novo que entrar aqui
+-- precisa do mesmo cuidado — conferir num aparelho, nao so no
+-- navegador do computador.
+--
 -- Este arquivo NAO apaga o cardapio de teste. Conferir o real na
 -- tela primeiro; a limpeza esta no fim de seed_teste_dev.sql.
 -- ============================================================
@@ -94,7 +100,7 @@ insert into produtos (estabelecimento_id, categoria_id, nome, descricao, preco, 
    30.00, 11),
 
   ('0d8ce944-a60e-469f-8dd5-622595fcab88', 'a1e7d3c4-5b62-4f18-9a03-7c2e8d1b4f60',
-   'Mexicano 🌶',
+   'Mexicano 🌶️',
    'Brioche artesanal, blend angus 160g, cheddar, bacon, maionese super picante, alface.',
    29.00, 12),
 
