@@ -105,9 +105,11 @@ Já rodadas: 002 (plaquinha), 003 (devolução), 004 (cardápio ao vivo),
 005 (só dono edita cardápio — confirmado em 15/08/2026 conferindo `pg_policies`),
 006 (heartbeat).
 
-**Cardápio de teste:** ids que começam com `00000000-0000-4000-8000-` são falsos
-(`supabase/seed\_teste\_dev.sql`). Apagar quando o cardápio real entrar; o comando
-está comentado no fim daquele arquivo. As 40 mesas são reais e ficam.
+**Cardápio de teste: APAGADO em 20/08/2026.** Os ids que começavam com
+`00000000-0000-4000-8000-` eram falsos (`supabase/seed\_teste\_dev.sql`) e saíram
+com o comando que estava no fim daquele arquivo. As 40 mesas são reais e ficaram.
+Apagar produto não apaga pedido antigo: `pedido\_itens.produto\_id` é
+`on delete set null` e o pedido guarda `nome\_snap`/`preco\_snap` (REGRA 3).
 
 **Cardápio real:** os 15 hambúrgueres entraram em 15/08/2026
 (`supabase/cardapio\_adoravelburguer.sql`, conferido pela API pública).
@@ -116,7 +118,8 @@ Categoria `a1e7d3c4-5b62-4f18-9a03-7c2e8d1b4f60`. Junto veio o grupo
 mecanismo de grupo reutilizável, mudar o preço amanhã é uma linha só.
 **Ainda falta:** bebidas, porções e o combo (+R$ 15). O combo não é produto,
 é escolha ("transforme SEU burger"), então vira grupo reutilizável quando as
-bebidas existirem. **O cardápio de teste ainda está lá**, convivendo com o real.
+bebidas existirem. Conferido pela API em 20/08/2026: 1 categoria, 15 produtos,
+1 grupo — nada de teste sobrou no banco.
 
 \---
 
@@ -287,9 +290,9 @@ A Fase 1 está fechada. Na fila, em ordem de risco:
 1. ~~Restringir alteração de preço ao dono~~ — **feito** (migração 005, confirmada
 15/08/2026: só `dono` tem policy de insert/update/delete em produtos, categorias,
 grupos\_opcoes e opcoes; leitura continua pública)
-2. **Cardápio real do Adorável Burguer** — hambúrgueres **feitos** (15/08/2026).
-Falta o resto do impresso (bebidas, porções, combo) e **apagar o de teste**,
-depois que o Isaac conferir o real na tela
+2. **Cardápio real do Adorável Burguer** — hambúrgueres **feitos** (15/08/2026)
+e cardápio de teste **apagado** (20/08/2026). Falta o resto do impresso
+(bebidas, porções, combo), que depende de foto das outras páginas
 3. **Deploy na Vercel** com as variáveis de ambiente
 4. ~~Heartbeat~~ — **feito** (migração 006 + Edge Functions `ping` e
 `verificar-heartbeat`, testadas de ponta a ponta em 15/08/2026).

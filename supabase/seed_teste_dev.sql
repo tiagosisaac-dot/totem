@@ -97,7 +97,11 @@ select
 
 
 -- ============================================================
--- LIMPEZA (rodar quando o cardapio real entrar)
+-- LIMPEZA — JA RODADA EM 20/08/2026
+--
+-- O cardapio de teste saiu do banco. Sobrou so o real: 1 categoria,
+-- 15 hamburgueres, 1 grupo de opcao. Conferido pela API publica.
+-- As 40 mesas sao reais e ficaram.
 --
 -- delete from produtos      where id::text like '00000000-0000-4000-8000-%';
 -- delete from grupos_opcoes where id::text like '00000000-0000-4000-8000-%';
@@ -105,4 +109,13 @@ select
 --
 -- (opcoes, produto_grupos, combo_slots e combo_slot_produtos
 --  desaparecem sozinhos por causa do "on delete cascade")
+--
+-- Apagar produto NAO apaga pedido antigo: pedido_itens.produto_id e
+-- "on delete set null" e o pedido guarda nome_snap/preco_snap.
+-- E a REGRA 3 funcionando — o historico continua legivel sem o
+-- produto existir.
+--
+-- Se um dia precisar de dados de teste de novo, rodar so as secoes
+-- 2 a 5 deste arquivo, NUNCA em producao com o cardapio real no ar:
+-- os ids sao fixos, entao rodar duas vezes da erro de chave duplicada.
 -- ============================================================

@@ -24,8 +24,8 @@
 -- precisa do mesmo cuidado — conferir num aparelho, nao so no
 -- navegador do computador.
 --
--- Este arquivo NAO apaga o cardapio de teste. Conferir o real na
--- tela primeiro; a limpeza esta no fim de seed_teste_dev.sql.
+-- Este arquivo nao apaga nada. O cardapio de teste que convivia com
+-- este foi apagado a parte em 20/08/2026 (fim de seed_teste_dev.sql).
 -- ============================================================
 
 -- ------------------------------------------------------------
