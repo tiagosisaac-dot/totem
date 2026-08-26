@@ -21,8 +21,8 @@ import NumeroMesa from '../componentes/NumeroMesa.jsx'
 
 // Sem tocar em nada por este tempo, o totem pergunta se a pessoa
 // ainda esta ali; sem resposta, limpa e volta ao inicio.
-const SEGUNDOS_ATE_AVISAR = 60
-const SEGUNDOS_DO_AVISO = 15
+const SEGUNDOS_ATE_AVISAR = 15
+const SEGUNDOS_DO_AVISO = 10
 
 export default function Totem() {
   const { slug } = useParams()
@@ -37,6 +37,7 @@ export default function Totem() {
   // envio lento faria o cliente achar que falhou, com o pedido ja gravado
   const [enviando, setEnviando] = useState(false)
   const [avisoEsgotado, setAvisoEsgotado] = useState(null)
+  const [confirmandoSair, setConfirmandoSair] = useState(false)
 
   const recomecar = useCallback(() => {
     setCarrinho([])
@@ -253,22 +254,46 @@ export default function Totem() {
   }
 
   if (etapa === 'cardapio') {
-    return comAviso(
-      <Cardapio
-        loja={loja}
-        estado={cardapio.estado}
-        categorias={cardapio.categorias}
-        produtos={cardapio.produtos}
-        corTexto={corTexto}
-        corFundo={corFundo}
-        carrinho={carrinho}
-        aoVoltar={() => setEtapa('inicial')}
-        aoVerPedido={() => setEtapa('carrinho')}
-        aoEscolherProduto={(produto) => {
-          setProdutoAberto(produto)
-          setEtapa('produto')
-        }}
-      />,
+    return (
+      <>
+        {comAviso(
+          <Cardapio
+            loja={loja}
+            estado={cardapio.estado}
+            categorias={cardapio.categorias}
+            produtos={cardapio.produtos}
+            corTexto={corTexto}
+            corFundo={corFundo}
+            carrinho={carrinho}
+            // Carrinho vazio volta direto: nao ha pedido para perder.
+            // Com item, pergunta antes — a mesma regra do aviso de
+            // inatividade, nunca apagar pedido montado sem avisar.
+            aoVoltar={() => {
+              if (carrinho.length === 0) {
+                recomecar()
+                return
+              }
+              setConfirmandoSair(true)
+            }}
+            aoVerPedido={() => setEtapa('carrinho')}
+            aoEscolherProduto={(produto) => {
+              setProdutoAberto(produto)
+              setEtapa('produto')
+            }}
+          />,
+        )}
+        {confirmandoSair && (
+          <ConfirmarSair
+            corTexto={corTexto}
+            corFundo={corFundo}
+            aoConfirmar={() => {
+              setConfirmandoSair(false)
+              recomecar()
+            }}
+            aoCancelar={() => setConfirmandoSair(false)}
+          />
+        )}
+      </>
     )
   }
 
@@ -329,6 +354,42 @@ function AvisoInatividade({ restam, corTexto, corFundo, aoContinuar, aoDesistir 
           style={{ borderColor: corTexto }}
         >
           Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ------------------------------------------------------------
+// CONFIRMA SAIDA — clique explicito em "Inicio" com carrinho cheio
+//
+// Mesma regra do aviso de inatividade: nunca apagar pedido montado
+// sem perguntar. A diferenca e que aqui foi o proprio cliente que
+// pediu para sair, entao nao ha contagem regressiva.
+// ------------------------------------------------------------
+function ConfirmarSair({ corTexto, corFundo, aoConfirmar, aoCancelar }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8 p-8 text-center"
+      style={{ backgroundColor: corFundo, color: corTexto }}
+    >
+      <p className="text-5xl font-black">Voltar ao início?</p>
+      <p className="text-3xl opacity-70">Seu pedido ainda não enviado será apagado.</p>
+
+      <div className="mt-4 flex flex-wrap justify-center gap-6">
+        <button
+          onClick={aoCancelar}
+          className="min-h-[88px] rounded-2xl px-16 text-3xl font-black active:scale-95"
+          style={{ backgroundColor: corTexto, color: corFundo }}
+        >
+          Continuar pedido
+        </button>
+        <button
+          onClick={aoConfirmar}
+          className="min-h-[88px] rounded-2xl border-4 px-12 text-3xl font-bold active:scale-95"
+          style={{ borderColor: corTexto }}
+        >
+          Voltar ao início
         </button>
       </div>
     </div>
