@@ -232,6 +232,19 @@ ordem e o dono não precisa organizar nada no fim do dia.
 6. "Pedido enviado. Mesa 17. Pague no caixa."
 7. Volta sozinho para a tela inicial após 15s
 
+**Uma linha do carrinho = uma configuração com uma quantidade.** As opções
+escolhidas valem para a linha inteira: 3 hambúrgueres com blend extra são 3 com
+blend, não 1 com e 2 sem. Quem quer um diferente adiciona de novo, e vira outra
+linha. Para isso não pegar o cliente de surpresa, a tela do produto avisa quando
+a quantidade passa de 1, e cada linha do carrinho tem **−** e **+** — dá para
+tirar um dos dois sem apagar a linha e refazer o pedido. O **−** para no 1; quem
+remove é o **×**, porque chegar a zero apagaria o item com o mesmo toque que
+estava diminuindo. O item guarda `unitarioMostrado` (o preço de UM, já com as
+opções) só para o carrinho poder refazer a conta da linha.
+
+Decidido em 26/08/2026, contra travar a quantidade em 1 ao personalizar e contra
+perguntar item por item — as duas custam mais toques, com fila esperando atrás.
+
 **Design:** alvos de toque grandes (mínimo 60px), fonte grande, contraste alto.
 É usado em pé, com pressa, por gente de todas as idades. Nada de menu enxuto
 tipo desktop.
@@ -290,9 +303,10 @@ A Fase 1 está fechada. Na fila, em ordem de risco:
 1. ~~Restringir alteração de preço ao dono~~ — **feito** (migração 005, confirmada
 15/08/2026: só `dono` tem policy de insert/update/delete em produtos, categorias,
 grupos\_opcoes e opcoes; leitura continua pública)
-2. **Cardápio real do Adorável Burguer** — hambúrgueres **feitos** (15/08/2026)
-e cardápio de teste **apagado** (20/08/2026). Falta o resto do impresso
-(bebidas, porções, combo), que depende de foto das outras páginas
+2. **Cardápio real do Adorável Burguer** — hambúrgueres **feitos** (15/08/2026),
+cardápio de teste **apagado** e as **15 fotos no ar** (20/08/2026, conferidas
+byte a byte pela API pública). Falta o resto do impresso (bebidas, porções,
+combo), que depende de foto das outras páginas
 3. **Deploy na Vercel** com as variáveis de ambiente
 4. ~~Heartbeat~~ — **feito** (migração 006 + Edge Functions `ping` e
 `verificar-heartbeat`, testadas de ponta a ponta em 15/08/2026).

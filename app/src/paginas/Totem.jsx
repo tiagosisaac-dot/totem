@@ -217,6 +217,21 @@ export default function Totem() {
           setCarrinho((atual) => atual.filter((_, i) => i !== indice))
           setAvisoEsgotado(null)
         }}
+        // Refaz o total da linha a partir do preco de UM, guardado
+        // quando o item foi montado. Sem ele nao daria: o total antigo
+        // ja tem a quantidade velha embutida, e dividir para descobrir
+        // o unitario erraria centavos por arredondamento.
+        aoMudarQuantidade={(indice, nova) => {
+          if (nova < 1 || nova > 99) return
+          setCarrinho((atual) =>
+            atual.map((item, i) =>
+              i === indice
+                ? { ...item, quantidade: nova, totalMostrado: item.unitarioMostrado * nova }
+                : item,
+            ),
+          )
+          setAvisoEsgotado(null)
+        }}
         aoFinalizar={() => setEtapa('mesa')}
       />,
     )

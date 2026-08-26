@@ -16,6 +16,7 @@ export default function Carrinho({
   avisoEsgotado,
   aoVoltar,
   aoRemover,
+  aoMudarQuantidade,
   aoFinalizar,
 }) {
   const total = carrinho.reduce((soma, item) => soma + item.totalMostrado, 0)
@@ -62,16 +63,38 @@ export default function Carrinho({
                 className="flex flex-wrap items-start gap-3 rounded-3xl border-4 p-4 sm:gap-4 sm:p-5"
                 style={{ borderColor: item.esgotado ? ALERTA : borda }}
               >
-                <span
-                  className="shrink-0 rounded-xl px-3 py-2 text-2xl font-black sm:px-4 sm:text-3xl"
-                  style={
-                    item.esgotado
-                      ? { backgroundColor: ALERTA, color: '#FFFFFF' }
-                      : { backgroundColor: corTexto, color: corFundo }
-                  }
-                >
-                  {item.quantidade}×
-                </span>
+                {/* Pediu 2 e quer levar 1: e aqui que ele resolve, sem
+                    apagar a linha e refazer o pedido do zero.
+                    O "−" PARA no 1 em vez de remover. Chegar no zero
+                    apagaria a linha com o mesmo toque que estava
+                    diminuindo — o cliente pisa uma vez a mais e o item
+                    some sem ele entender. Para remover existe o ×. */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <BotaoQtd
+                    rotulo="−"
+                    desabilitado={item.quantidade <= 1}
+                    corTexto={corTexto}
+                    aoTocar={() => aoMudarQuantidade(indice, item.quantidade - 1)}
+                    descricao={`Menos um ${item.produto.nome}`}
+                  />
+                  <span
+                    className="w-[58px] rounded-xl py-2 text-center text-2xl font-black sm:w-[68px] sm:text-3xl"
+                    style={
+                      item.esgotado
+                        ? { backgroundColor: ALERTA, color: '#FFFFFF' }
+                        : { backgroundColor: corTexto, color: corFundo }
+                    }
+                  >
+                    {item.quantidade}×
+                  </span>
+                  <BotaoQtd
+                    rotulo="+"
+                    desabilitado={item.quantidade >= 99}
+                    corTexto={corTexto}
+                    aoTocar={() => aoMudarQuantidade(indice, item.quantidade + 1)}
+                    descricao={`Mais um ${item.produto.nome}`}
+                  />
+                </div>
 
                 <div className="min-w-[8rem] flex-1">
                   <p className="text-2xl font-bold sm:text-3xl">{item.produto.nome}</p>
@@ -132,5 +155,23 @@ export default function Carrinho({
         </button>
       </footer>
     </div>
+  )
+}
+
+// ------------------------------------------------------------
+// Botao de mais/menos. Menor que o × ao lado (56 contra 64) porque
+// mudar a quantidade e reversivel com um toque e remover nao e.
+// ------------------------------------------------------------
+function BotaoQtd({ rotulo, desabilitado, corTexto, aoTocar, descricao }) {
+  return (
+    <button
+      onClick={aoTocar}
+      disabled={desabilitado}
+      aria-label={descricao}
+      className="h-[56px] w-[56px] shrink-0 rounded-2xl border-4 text-3xl font-black disabled:opacity-30 active:enabled:scale-95"
+      style={{ borderColor: corTexto }}
+    >
+      {rotulo}
+    </button>
   )
 }

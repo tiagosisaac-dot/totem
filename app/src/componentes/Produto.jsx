@@ -107,9 +107,15 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
   }
 
   // ----------------------------------------------------------
-  // Total de VITRINE (o servidor recalcula — ver aviso no topo)
+  // Preco de UM, com o que foi escolhido (vitrine — o servidor
+  // recalcula, ver aviso no topo).
+  //
+  // Fica separado da quantidade de proposito: o carrinho deixa o
+  // cliente mudar o numero de itens depois, e para recalcular a
+  // linha ele precisa saber quanto custa UM. Multiplicar aqui e
+  // guardar so o total deixaria o carrinho sem essa conta.
   // ----------------------------------------------------------
-  const totalMostrado = useMemo(() => {
+  const unitarioMostrado = useMemo(() => {
     let unitario = Number(produto.preco) || 0
 
     for (const grupo of grupos) {
@@ -126,8 +132,17 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
       }
     }
 
-    return unitario * quantidade
-  }, [produto.preco, grupos, slots, selecionadas, escolhasCombo, quantidade])
+    return unitario
+  }, [produto.preco, grupos, slots, selecionadas, escolhasCombo])
+
+  const totalMostrado = unitarioMostrado * quantidade
+
+  // O que o cliente escolheu vale para a LINHA inteira, nao para um
+  // sanduiche. Com quantidade 1 isso e obvio; com 3 nao e, e ele so
+  // descobriria no carrinho — ou pior, na mesa. Entao a tela avisa.
+  const escolheuAlgo =
+    Object.values(selecionadas).some((ids) => ids.length > 0) ||
+    Object.values(escolhasCombo).some((ids) => ids.length > 0)
 
   // ----------------------------------------------------------
   // O que ainda falta escolher
@@ -188,7 +203,10 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
         produtos.map((produtoId) => ({ slot_id: slotId, produto_id: produtoId })),
       ),
       resumo,
-      totalMostrado, // vitrine; o servidor recalcula
+      // vitrine; o servidor recalcula. O unitario vai junto porque o
+      // carrinho refaz a conta quando o cliente muda a quantidade la.
+      unitarioMostrado,
+      totalMostrado,
     })
   }
 
@@ -281,6 +299,20 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
           </Bloco>
         ))}
       </div>
+
+      {/* Fica FORA da area que rola: se estivesse junto das opcoes, o
+          cliente que rolou para ver o preco nao leria o aviso. */}
+      {escolheuAlgo && quantidade > 1 && (
+        <p
+          className="border-t-2 px-4 py-3 text-xl font-bold sm:px-6 sm:text-2xl"
+          style={{ borderColor: borda, backgroundColor: `${corTexto}12` }}
+        >
+          O que você escolheu vale para os {quantidade}.{' '}
+          <span className="font-normal opacity-70">
+            Para um diferente, adicione ele separado.
+          </span>
+        </p>
+      )}
 
       {/* Barra de baixo: quantidade e confirmacao.
           Em tela estreita eles empilham — lado a lado, o botao ficava
