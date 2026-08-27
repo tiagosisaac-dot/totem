@@ -19,6 +19,13 @@
 -- variavel, o card mostraria R$22 mas o Oreo custa R$27, e o cliente
 -- só descobriria a diferenca depois de abrir o produto.
 --
+-- A foto original estava de cabeça para baixo, o que causou duas
+-- leituras erradas na primeira versao deste arquivo (ja corrigidas
+-- aqui, e no banco via correcao_batata_frita_28082026.sql):
+--   Pequena era 120g, nao 200g.
+--   Adorável Batata tinha descricao ("Nutella e leite ninho") que
+--   ficou de fora por nao ter sido vista na foto invertida.
+--
 -- Este arquivo nao apaga nada.
 -- ============================================================
 
@@ -37,7 +44,7 @@ insert into categorias (id, estabelecimento_id, nome, ordem) values
 -- ------------------------------------------------------------
 insert into produtos (estabelecimento_id, categoria_id, nome, descricao, preco, ordem) values
   ('0d8ce944-a60e-469f-8dd5-622595fcab88', '8173df9c-25e5-48f0-834a-48e4bd2ab47e',
-   'Pequena', 'Aprox. 200g.', 11.00, 1),
+   'Pequena', 'Aprox. 120g.', 11.00, 1),
 
   ('0d8ce944-a60e-469f-8dd5-622595fcab88', '8173df9c-25e5-48f0-834a-48e4bd2ab47e',
    'Grande', 'Aprox. 300g.', 21.00, 2),
@@ -46,7 +53,7 @@ insert into produtos (estabelecimento_id, categoria_id, nome, descricao, preco, 
    'Cheddar e Bacon', null, 28.00, 3),
 
   ('0d8ce944-a60e-469f-8dd5-622595fcab88', '8173df9c-25e5-48f0-834a-48e4bd2ab47e',
-   'Adorável Batata', null, 30.00, 4),
+   'Adorável Batata', 'Nutella e leite ninho.', 30.00, 4),
 
   ('0d8ce944-a60e-469f-8dd5-622595fcab88', '8173df9c-25e5-48f0-834a-48e4bd2ab47e',
    'Batata Supreme',
