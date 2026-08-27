@@ -42,8 +42,14 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
         supabase
           .from('produto_grupos')
           .select(
+            // opcoes!opcoes_grupo_id_fkey: precisa nomear a relacao porque
+            // depende_da_opcao_id criou um SEGUNDO caminho entre
+            // grupos_opcoes e opcoes. Sem isso o PostgREST recusa a
+            // consulta inteira (PGRST201, "mais de um relacionamento
+            // encontrado") — foi o que quebrou TODO produto no ar depois
+            // da migracao 007, ate essa correcao.
             'ordem, grupos_opcoes!inner(id, nome, tipo, min_selecao, max_selecao, ativo, ' +
-              'depende_da_opcao_id, opcoes(id, nome, preco_adicional, disponivel, ordem))',
+              'depende_da_opcao_id, opcoes!opcoes_grupo_id_fkey(id, nome, preco_adicional, disponivel, ordem))',
           )
           .eq('produto_id', produto.id)
           .order('ordem'),
