@@ -296,7 +296,8 @@ Deno.serve(async (req) => {
     const { data: vinculos, error: erroVinc } = await sb
       .from('produto_grupos')
       .select(
-        'produto_id, grupo_id, grupos_opcoes!inner(id, nome, min_selecao, max_selecao, ativo, estabelecimento_id)',
+        'produto_id, grupo_id, grupos_opcoes!inner(id, nome, min_selecao, max_selecao, ativo, ' +
+          'estabelecimento_id, depende_da_opcao_id)',
       )
       .in('produto_id', idsProdutosTopo)
 
@@ -309,6 +310,7 @@ Deno.serve(async (req) => {
       max_selecao: number | null
       ativo: boolean
       estabelecimento_id: string
+      depende_da_opcao_id: string | null
     }
     // produto -> grupos permitidos
     const gruposDoProduto = new Map<string, Grupo[]>()
@@ -432,8 +434,26 @@ Deno.serve(async (req) => {
       }
 
       // minimo e maximo de cada grupo (inclusive grupos onde nada foi escolhido)
+      //
+      // Grupo com depende_da_opcao_id so vale se a opcao-gatilho (de
+      // OUTRO grupo do mesmo item) tambem foi escolhida. Sem isso,
+      // dava para mandar so o id da "Bebida do combo" e ganhar a
+      // bebida sem pagar o combo — o totem nunca chegaria a mostrar
+      // essa tela, mas a Edge Function nao pode confiar no totem.
+      const idsOpcoesDoItem = new Set(item.opcoes!)
+
       for (const grupo of permitidos) {
         const quantas = escolhidasPorGrupo.get(grupo.id) ?? 0
+        const gatilhoAtivo =
+          !grupo.depende_da_opcao_id || idsOpcoesDoItem.has(grupo.depende_da_opcao_id)
+
+        if (!gatilhoAtivo) {
+          if (quantas > 0) {
+            throw new ErroPedido(`${produto.nome}: "${grupo.nome}" não se aplica aqui.`)
+          }
+          continue
+        }
+
         if (quantas < grupo.min_selecao) {
           throw new ErroPedido(
             `${produto.nome}: escolha ${grupo.min_selecao} opção(ões) em "${grupo.nome}".`,

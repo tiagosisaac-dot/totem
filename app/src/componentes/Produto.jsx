@@ -43,7 +43,7 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
           .from('produto_grupos')
           .select(
             'ordem, grupos_opcoes!inner(id, nome, tipo, min_selecao, max_selecao, ativo, ' +
-              'opcoes(id, nome, preco_adicional, disponivel, ordem))',
+              'depende_da_opcao_id, opcoes(id, nome, preco_adicional, disponivel, ordem))',
           )
           .eq('produto_id', produto.id)
           .order('ordem'),
@@ -107,6 +107,30 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
   }
 
   // ----------------------------------------------------------
+  // Grupos condicionais — "Bebida do combo" so existe depois que
+  // "Transformar em combo" for marcado (depende_da_opcao_id).
+  //
+  // Filtrar aqui, num lugar so, evita ter que apagar a escolha do
+  // grupo escondido quando o gatilho e desmarcado: ela so fica sem
+  // efeito (nao conta preco, nao e exigida, nao vai para o servidor)
+  // ate o grupo aparecer nas novo. Se o cliente marcar o combo de
+  // novo na mesma visita, a bebida que ele tinha escolhido volta.
+  // ----------------------------------------------------------
+  const idsOpcoesSelecionadas = useMemo(
+    () => new Set(Object.values(selecionadas).flat()),
+    [selecionadas],
+  )
+
+  const gruposVisiveis = useMemo(
+    () =>
+      grupos.filter(
+        (grupo) =>
+          !grupo.depende_da_opcao_id || idsOpcoesSelecionadas.has(grupo.depende_da_opcao_id),
+      ),
+    [grupos, idsOpcoesSelecionadas],
+  )
+
+  // ----------------------------------------------------------
   // Preco de UM, com o que foi escolhido (vitrine — o servidor
   // recalcula, ver aviso no topo).
   //
@@ -118,7 +142,7 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
   const unitarioMostrado = useMemo(() => {
     let unitario = Number(produto.preco) || 0
 
-    for (const grupo of grupos) {
+    for (const grupo of gruposVisiveis) {
       for (const idOpcao of selecionadas[grupo.id] ?? []) {
         const opcao = grupo.opcoes.find((o) => o.id === idOpcao)
         unitario += Number(opcao?.preco_adicional) || 0
@@ -133,7 +157,7 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
     }
 
     return unitario
-  }, [produto.preco, grupos, slots, selecionadas, escolhasCombo])
+  }, [produto.preco, gruposVisiveis, slots, selecionadas, escolhasCombo])
 
   const totalMostrado = unitarioMostrado * quantidade
 
@@ -141,7 +165,7 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
   // sanduiche. Com quantidade 1 isso e obvio; com 3 nao e, e ele so
   // descobriria no carrinho — ou pior, na mesa. Entao a tela avisa.
   const escolheuAlgo =
-    Object.values(selecionadas).some((ids) => ids.length > 0) ||
+    gruposVisiveis.some((grupo) => (selecionadas[grupo.id] ?? []).length > 0) ||
     Object.values(escolhasCombo).some((ids) => ids.length > 0)
 
   // ----------------------------------------------------------
@@ -151,7 +175,7 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
   // cliente entender o que falta, nao para garantir nada.
   // ----------------------------------------------------------
   const pendencia = useMemo(() => {
-    for (const grupo of grupos) {
+    for (const grupo of gruposVisiveis) {
       const quantas = (selecionadas[grupo.id] ?? []).length
       if (quantas < grupo.min_selecao) return `Escolha: ${grupo.nome}`
     }
@@ -160,7 +184,7 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
       if (quantas < slot.min_selecao) return `Escolha: ${slot.nome}`
     }
     return null
-  }, [grupos, slots, selecionadas, escolhasCombo])
+  }, [gruposVisiveis, slots, selecionadas, escolhasCombo])
 
   if (estado === 'carregando') {
     return <Recado texto="Carregando..." corTexto={corTexto} corFundo={corFundo} />
@@ -180,13 +204,18 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
   function confirmar() {
     // nomes do que foi escolhido, SO PARA EXIBIR no carrinho.
     // O que vai para o servidor sao os ids, logo abaixo.
+    //
+    // So os grupos VISIVEIS entram aqui. Se o cliente marcou uma
+    // bebida do combo e depois desmarcou o combo, essa escolha fica
+    // para tras — nem aparece no resumo, nem e cobrada, nem vai para
+    // o servidor.
     const resumo = [
       ...slots.flatMap((slot) =>
         (escolhasCombo[slot.id] ?? []).map(
           (id) => slot.combo_slot_produtos.find((p) => p.produtos?.id === id)?.produtos?.nome,
         ),
       ),
-      ...grupos.flatMap((grupo) =>
+      ...gruposVisiveis.flatMap((grupo) =>
         (selecionadas[grupo.id] ?? []).map(
           (id) => grupo.opcoes.find((o) => o.id === id)?.nome,
         ),
@@ -198,7 +227,7 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
       quantidade,
       // ids das opcoes escolhidas, achatados numa lista so —
       // e o formato que a Edge Function espera
-      opcoes: Object.values(selecionadas).flat(),
+      opcoes: gruposVisiveis.flatMap((grupo) => selecionadas[grupo.id] ?? []),
       comboEscolhas: Object.entries(escolhasCombo).flatMap(([slotId, produtos]) =>
         produtos.map((produtoId) => ({ slot_id: slotId, produto_id: produtoId })),
       ),
@@ -272,8 +301,10 @@ export default function Produto({ produto, corTexto, corFundo, aoVoltar, aoAdici
           </Bloco>
         ))}
 
-        {/* adicionais, remocoes e escolhas */}
-        {grupos.map((grupo) => (
+        {/* adicionais, remocoes e escolhas. So os visiveis: um grupo
+            com depende_da_opcao_id preenchido nao aparece ate a
+            opcao-gatilho ser marcada (ex.: Bebida do combo). */}
+        {gruposVisiveis.map((grupo) => (
           <Bloco
             key={grupo.id}
             titulo={grupo.nome}
