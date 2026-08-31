@@ -40,7 +40,11 @@ function opcoesParaExibir(item) {
   for (const opcao of item.pedido_item_opcoes ?? []) {
     if (OPCAO_VIRAR_COMBO.test(opcao.nome_snap)) {
       combo = true
-      const acompanha = opcao.nome_snap.match(/\(([^)]+)\)/)?.[1]
+      // "e bebida" sai do texto: a bebida escolhida ja aparece na
+      // linha de baixo, como opcao propria (ex.: "Fanta Uva")
+      const acompanha = opcao.nome_snap
+        .match(/\(([^)]+)\)/)?.[1]
+        ?.replace(/\s+e\s+bebida\s*$/i, '')
       if (acompanha) linhas.push(acompanha.charAt(0).toUpperCase() + acompanha.slice(1))
       continue
     }
