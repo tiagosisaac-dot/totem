@@ -171,13 +171,17 @@ export default function Impressora() {
   )
 
   // ---- pedido novo imprime sozinho, uma tentativa automatica por pedido ----
+  // so marca como "tentado" quando o QZ Tray ja esta pronto pra imprimir de
+  // verdade — senao um pedido que chega antes da conexao terminar fica
+  // descartado pra sempre, sem tentar de novo sozinho quando conectar.
   useEffect(() => {
+    if (!qzConectado || !impressoraNome) return
     for (const pedido of pedidos) {
       if (pedido.impresso_em || jaTentados.current.has(pedido.id)) continue
       jaTentados.current.add(pedido.id)
       imprimir(pedido)
     }
-  }, [pedidos, imprimir])
+  }, [pedidos, imprimir, qzConectado, impressoraNome])
 
   const bloqueio = bloqueioDoPainel(painel, 'Impressora')
   if (bloqueio) return bloqueio
