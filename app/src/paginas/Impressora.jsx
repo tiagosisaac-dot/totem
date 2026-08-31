@@ -5,12 +5,15 @@
 // Bematech i9. O navegador sozinho nao alcança impressora USB — o
 // QZ Tray (instalado nesse computador) e a ponte.
 //
-// Pedido novo do totem imprime sozinho. Papel pode emperrar ou
-// acabar: por isso cada pedido do dia tem um botao "Reimprimir" —
-// nunca falha silenciosa (mesmo principio do heartbeat).
+// Pedido NAO imprime sozinho — precisa do clique manual em "Imprimir"
+// (botao vermelho), depois que o caixa confirma o pagamento. Sem
+// isso, pedido de quem desiste antes de pagar iria pra producao do
+// mesmo jeito. Depois de impresso, vira "Reimprimir" (verde) — papel
+// pode emperrar ou acabar, nunca falha silenciosa (mesmo principio
+// do heartbeat).
 // ============================================================
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import qz from 'qz-tray'
 import { supabase } from '../lib/supabase.js'
@@ -34,9 +37,6 @@ export default function Impressora() {
   const [qzErro, setQzErro] = useState(null)
   const [pedidos, setPedidos] = useState([])
   const [erroImpressao, setErroImpressao] = useState(null)
-  // guarda quem ja tentou imprimir NESTA aba, pra uma falha nao
-  // ficar tentando de novo a cada pedido novo que chega
-  const jaTentados = useRef(new Set())
 
   // ---- config desta loja: nome da impressora + certificado do QZ Tray ----
   // (estabelecimentos.config e jsonb — REGRA 1, nada fixo no codigo)
@@ -146,8 +146,8 @@ export default function Impressora() {
     }
   }, [acesso, loja, carregarPedidos])
 
-  // ---- imprime um pedido (chamado sozinho para pedido novo, ou
-  // pelo botao "Reimprimir") ----
+  // ---- imprime um pedido, sempre por clique manual (botao
+  // "Imprimir"/"Reimprimir") — nunca automatico, ver nota no topo ----
   const imprimir = useCallback(
     async (pedido) => {
       if (!qzConectado) {
@@ -183,19 +183,6 @@ export default function Impressora() {
     },
     [qzConectado, config],
   )
-
-  // ---- pedido novo imprime sozinho, uma tentativa automatica por pedido ----
-  // so marca como "tentado" quando o QZ Tray ja esta pronto pra imprimir de
-  // verdade — senao um pedido que chega antes da conexao terminar fica
-  // descartado pra sempre, sem tentar de novo sozinho quando conectar.
-  useEffect(() => {
-    if (!qzConectado || !config?.impressoraNome) return
-    for (const pedido of pedidos) {
-      if (pedido.impresso_em || jaTentados.current.has(pedido.id)) continue
-      jaTentados.current.add(pedido.id)
-      imprimir(pedido)
-    }
-  }, [pedidos, imprimir, qzConectado, config])
 
   const bloqueio = bloqueioDoPainel(painel, 'Impressora')
   if (bloqueio) return bloqueio
@@ -251,15 +238,15 @@ export default function Impressora() {
                 </div>
 
                 <span className="text-lg font-bold opacity-60">
-                  {pedido.impresso_em ? 'Impresso' : 'Aguardando impressão'}
+                  {pedido.impresso_em ? 'Já foi pra cozinha' : 'Aguardando pagamento no caixa'}
                 </span>
 
                 <button
                   onClick={() => imprimir(pedido)}
-                  className="min-h-[60px] rounded-xl border-4 px-5 text-xl font-bold active:scale-95"
-                  style={{ borderColor: corTexto }}
+                  className="min-h-[60px] rounded-xl px-5 text-xl font-bold text-white active:scale-95"
+                  style={{ backgroundColor: pedido.impresso_em ? '#16A34A' : ALERTA }}
                 >
-                  Reimprimir
+                  {pedido.impresso_em ? 'Reimprimir' : 'Imprimir'}
                 </button>
               </li>
             ))}

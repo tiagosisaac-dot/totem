@@ -233,8 +233,16 @@ rede), o navegador sozinho não alcança — precisa de uma ponte local.
 **Ponte escolhida: QZ Tray.** Programa grátis, instala uma vez no computador da
 loja. Depois disso, basta deixar uma aba do navegador aberta em
 `/:slug/impressora` **naquele computador** (login com `cozinha@...`, mesmo
-usuário de sempre) — ela conecta no QZ Tray sozinha e manda imprimir a cada
-pedido novo.
+usuário de sempre) — ela conecta no QZ Tray sozinha.
+
+**Impressão NÃO é automática (mudou em 31/08/2026)** — pedido novo chega na
+tela como "Aguardando pagamento no caixa" (botão vermelho "Imprimir"), não
+imprime sozinho. Motivo: o pagamento é no caixa, depois do totem (item 5 da
+Fase 1) — se imprimisse na hora do pedido, cliente que desiste antes de pagar
+já teria comida em produção na cozinha. Alguém (caixa ou cozinha) só aperta
+"Imprimir" depois que o cliente pagou. Depois de impresso, o botão vira verde
+e o texto "Reimprimir" — continua ali pra reimprimir se o papel emperrar
+(nunca falha silenciosa).
 
 * `estabelecimentos.config.impressora\_nome` (jsonb, sem migração nova) guarda
 o nome EXATO que o Windows dá à impressora depois de instalado o QZ Tray —
@@ -363,7 +371,9 @@ tipo desktop.
 menor do que "mesa errada" era: nome trocado não manda comida pra estranho,
 só obriga a equipe a perguntar de novo no balcão
 * **Impressão falha** (papel emperrou/acabou) — nunca falha silenciosa: a tela
-`/impressora` mostra "Aguardando impressão" e tem botão "Reimprimir" por pedido
+`/impressora` mostra o pedido e tem botão "Imprimir"/"Reimprimir" (nunca some)
+* **Cliente desiste de pagar** — impressão é manual, só depois da confirmação
+no caixa (ver "Impressão do pedido" acima), pedido não vira comida sozinho
 * **Totem caiu** — heartbeat, Isaac precisa saber antes do dono ligar
 
 \---
