@@ -27,31 +27,58 @@ const SELECT_PEDIDO =
   'id, senha, nome_cliente, tipo_consumo, total, criado_em, impresso_em, ' +
   'pedido_itens(id, nome_snap, quantidade, combo_pai_id, pedido_item_opcoes(nome_snap))'
 
+// A opcao "Transformar em combo" traz um texto longo (nome_snap tipo
+// "Sim, virar combo (acompanha batata frita pequena e bebida)") — bom
+// no totem, verboso demais pra conferir rapido no caixa. Aqui essa
+// opcao vira o prefixo "COMBO" no nome do item, e o que tem entre
+// parenteses (o que acompanha) vira uma linha propria.
+const OPCAO_VIRAR_COMBO = /^sim, virar combo\b/i
+
+function opcoesParaExibir(item) {
+  let combo = false
+  const linhas = []
+  for (const opcao of item.pedido_item_opcoes ?? []) {
+    if (OPCAO_VIRAR_COMBO.test(opcao.nome_snap)) {
+      combo = true
+      const acompanha = opcao.nome_snap.match(/\(([^)]+)\)/)?.[1]
+      if (acompanha) linhas.push(acompanha.charAt(0).toUpperCase() + acompanha.slice(1))
+      continue
+    }
+    linhas.push(opcao.nome_snap)
+  }
+  return { combo, linhas }
+}
+
 // Lista do que foi pedido, pra equipe conferir com o cliente antes de
-// imprimir — mesma logica de combo/opcoes do cupom (cupom.js).
+// imprimir — mesma logica de combo/opcoes do cupom (cupom.js), com o
+// texto do combo simplificado pra essa tela (ver opcoesParaExibir).
 function ItensDoPedido({ pedido }) {
   const principais = pedido.pedido_itens.filter((i) => !i.combo_pai_id)
   const filhosDe = (id) => pedido.pedido_itens.filter((i) => i.combo_pai_id === id)
 
   return (
     <ul className="mt-1 flex flex-col gap-1">
-      {principais.map((item) => (
-        <li key={item.id} className="text-lg">
-          <span className="font-semibold">
-            {item.quantidade}x {item.nome_snap}
-          </span>
-          {(item.pedido_item_opcoes ?? []).map((opcao, i) => (
-            <span key={i} className="block pl-5 text-base opacity-70">
-              + {opcao.nome_snap}
+      {principais.map((item) => {
+        const { combo, linhas } = opcoesParaExibir(item)
+        return (
+          <li key={item.id} className="text-lg">
+            <span className="font-semibold">
+              {combo && 'COMBO '}
+              {item.quantidade}x {item.nome_snap}
             </span>
-          ))}
-          {filhosDe(item.id).map((filho) => (
-            <span key={filho.id} className="block pl-5 text-base opacity-70">
-              → {filho.nome_snap}
-            </span>
-          ))}
-        </li>
-      ))}
+            {linhas.map((linha, i) => (
+              <span key={i} className="block pl-5 text-base opacity-70">
+                + {linha}
+              </span>
+            ))}
+            {filhosDe(item.id).map((filho) => (
+              <span key={filho.id} className="block pl-5 text-base opacity-70">
+                → {filho.nome_snap}
+              </span>
+            ))}
+          </li>
+        )
+      })}
     </ul>
   )
 }
