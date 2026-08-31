@@ -222,7 +222,8 @@ totem de propósito não é queda.
 
 \---
 
-## Impressão do pedido (QZ Tray) — 29/08/2026, ainda não testada na loja
+## Impressão do pedido (QZ Tray) — 31/08/2026, testada em casa (Microsoft
+## Print to PDF), ainda não testada com a i9 física na loja
 
 O Adorável Burguer não usa tela de cozinha nem plaquinha: o pedido do totem sai
 **impresso na Bematech i9**, a mesma impressora onde já saem os pedidos do
@@ -244,9 +245,34 @@ falha silenciosa.
 * Cupom em ESC/POS cru (`app/src/lib/cupom.js`): cabeçalho "PEDIDO TOTEM",
 nome do cliente em destaque, "COMER AQUI"/"PARA LEVAR", itens, total. A senha
 sai pequena, só referência — não é o destaque (decisão do Isaac).
-* **Sem certificado configurado**: o QZ Tray vai pedir pra autorizar a conexão
-na primeira vez (aviso de "site não confiável"). É esperado — aceitar e marcar
-"lembrar" se o programa oferecer essa opção.
+* **Certificado do QZ Tray, por estabelecimento (`app/src/lib/qzTray.js` +
+`estabelecimentos.config.qz_certificado`/`qz_chave_privada`, testado e
+funcionando em 31/08/2026).** Sem certificado, toda conexão aparece pro QZ
+Tray como "anônima" — e conexão anônima NUNCA deixa marcar "Remember this
+decision" (o QZ Tray desabilita o botão Allow quando a caixinha é marcada),
+então pedia autorização manual a cada impressão. A correção: cada
+estabelecimento tem um par certificado+chave RSA próprio (gerado com openssl,
+`basicConstraints=CA:FALSE` + `keyUsage=digitalSignature,keyEncipherment` —
+sem esses dois o QZ Tray classifica como "Invalid Certificate"), guardado só
+no banco (REGRA 1, nunca versionado). `Impressora.jsx` busca do
+`estabelecimentos.config` e assina cada requisição com `jsrsasign`
+(`qzTray.js`) antes de conectar.
+  * **Cadastro de cliente novo:** gerar o par com openssl (comandos no
+  histórico desta sessão), rodar um UPDATE avulso em `estabelecimentos.config`
+  (nunca commitar a chave privada — gerar, colar num arquivo temporário local,
+  pedir pra rodar, apagar o arquivo depois, igual já se faz com os `.reg`).
+  * **Ainda assim, o "Remember this decision" da janela pop-up tem um bug
+  visual no QZ Tray 2.2.6** (marcar a caixinha desabilita o Allow, mesmo com
+  certificado válido — não é resolvido só com certificado). **O que resolve de
+  verdade:** no ícone do QZ Tray (perto do relógio) → botão direito →
+  "Advanced" → aba **"Sites"/"Site Manager"** → **"+"** → **"Browse..."** →
+  seleciona um arquivo `.txt` com o certificado público (só o `CERTIFICATE`,
+  nunca a chave privada) → aceita "copiar para `override.crt`" quando
+  perguntar. Isso instala como confiança permanente no QZ Tray daquele
+  computador, sem depender do checkbox com bug. **Precisa repetir em cada
+  computador novo** que for abrir `/impressora` (o computador da loja
+  incluído) — dar o arquivo `.txt` do certificado (não a chave) pra fazer esse
+  Browse lá.
 * **Permissão "Apps no dispositivo" do Chrome (descoberto em 31/08/2026,
 testando em `localhost` vs. no site publicado).** Chrome recente bloqueia por
 padrão qualquer site publicado (https, fora do próprio computador) de acessar
@@ -262,11 +288,18 @@ por site E por computador/navegador — **precisa repetir esse passo em toda
 máquina nova** que abrir `/impressora` (inclusive no(s) computador(es) da
 loja). Fica registrado no Chrome depois de feito uma vez, não precisa repetir
 a cada pedido nem a cada abertura da aba.
-* **O que falta**: Isaac instalar o QZ Tray no computador da loja (**lembrar de
-liberar "Apps no dispositivo" pro site nesse Chrome também**), configurar a i9,
-rodar o SQL do nome da impressora, e testar um pedido de verdade. O formato do
-cupom é ponto de partida razoável (i9 aceita ESC/POS), mas só se ajusta vendo o
-papel sair — esperado precisar de 1-2 ajustes.
+* **Testado em 31/08/2026, funcionando de ponta a ponta com uma impressora
+virtual (Microsoft Print to PDF)**: totem → banco → tela `/impressora` →
+QZ Tray → impressão automática, sem clique manual, `impresso_em` grava certo.
+Confirma que só falta a parte física.
+* **O que falta**: Isaac instalar o QZ Tray no computador da loja (repetir
+"Apps no dispositivo" no Chrome + o passo do Site Manager/`override.crt`
+acima, com o certificado do Adorável Burguer), configurar a i9, rodar o SQL do
+nome da impressora, e testar um pedido de verdade na impressora física. O
+formato do cupom é ponto de partida razoável (i9 aceita ESC/POS, mas só foi
+validado contra uma impressora virtual até aqui — nunca testou o ESC/POS cru
+saindo em papel de verdade), esperado precisar de 1-2 ajustes vendo o papel
+sair.
 
 \---
 
