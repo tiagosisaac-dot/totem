@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",
+    "jsrsasign": "^11.1.5",
     "qz-tray": "^2.2.6",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

@@ -16,6 +16,7 @@ import qz from 'qz-tray'
 import { supabase } from '../lib/supabase.js'
 import { useLojaLogada } from '../lib/useLojaLogada.js'
 import { montarCupom } from '../lib/cupom.js'
+import { configurarAssinaturaQz } from '../lib/qzTray.js'
 import { emReais } from '../lib/formato.js'
 import { ALERTA, Cabecalho, bloqueioDoPainel } from '../componentes/PainelComuns.jsx'
 
@@ -28,7 +29,7 @@ export default function Impressora() {
   const painel = useLojaLogada(slug)
   const { loja, acesso, corTexto, corFundo } = painel
 
-  const [impressoraNome, setImpressoraNome] = useState(null)
+  const [config, setConfig] = useState(null)
   const [qzConectado, setQzConectado] = useState(false)
   const [qzErro, setQzErro] = useState(null)
   const [pedidos, setPedidos] = useState([])
@@ -37,7 +38,7 @@ export default function Impressora() {
   // ficar tentando de novo a cada pedido novo que chega
   const jaTentados = useRef(new Set())
 
-  // ---- nome da impressora configurado para esta loja ----
+  // ---- config desta loja: nome da impressora + certificado do QZ Tray ----
   // (estabelecimentos.config e jsonb — REGRA 1, nada fixo no codigo)
   useEffect(() => {
     if (!loja) return
@@ -49,7 +50,13 @@ export default function Impressora() {
       .eq('id', loja.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (!cancelado) setImpressoraNome(data?.config?.impressora_nome ?? null)
+        if (cancelado) return
+        const cfg = data?.config ?? {}
+        setConfig({
+          impressoraNome: cfg.impressora_nome ?? null,
+          qzCertificado: cfg.qz_certificado ?? null,
+          qzChavePrivada: cfg.qz_chave_privada ?? null,
+        })
       })
 
     return () => {
@@ -59,8 +66,15 @@ export default function Impressora() {
 
   // ---- conexao com o QZ Tray instalado neste computador ----
   useEffect(() => {
-    if (acesso !== 'liberado') return
+    if (acesso !== 'liberado' || !config) return
+
+    if (!config.qzCertificado || !config.qzChavePrivada) {
+      setQzErro('Certificado do QZ Tray não configurado para esta loja.')
+      return
+    }
+
     let cancelado = false
+    configurarAssinaturaQz(qz, config.qzCertificado, config.qzChavePrivada)
 
     qz.websocket
       .connect()
@@ -77,7 +91,7 @@ export default function Impressora() {
       cancelado = true
       if (qz.websocket.isActive()) qz.websocket.disconnect()
     }
-  }, [acesso])
+  }, [acesso, config])
 
   // ---- pedidos de hoje, tempo real (mesmo padrao da antiga tela de cozinha) ----
   const carregarPedidos = useCallback(async () => {
@@ -140,15 +154,15 @@ export default function Impressora() {
         setErroImpressao('QZ Tray não está conectado. Não é possível imprimir.')
         return
       }
-      if (!impressoraNome) {
+      if (!config?.impressoraNome) {
         setErroImpressao('Nenhuma impressora configurada para esta loja.')
         return
       }
 
       setErroImpressao(null)
       try {
-        const config = qz.configs.create(impressoraNome)
-        await qz.print(config, [montarCupom(pedido)])
+        const configImpressao = qz.configs.create(config.impressoraNome)
+        await qz.print(configImpressao, [montarCupom(pedido)])
 
         const agora = new Date().toISOString()
         const { error } = await supabase
@@ -167,7 +181,7 @@ export default function Impressora() {
         )
       }
     },
-    [qzConectado, impressoraNome],
+    [qzConectado, config],
   )
 
   // ---- pedido novo imprime sozinho, uma tentativa automatica por pedido ----
@@ -175,13 +189,13 @@ export default function Impressora() {
   // verdade — senao um pedido que chega antes da conexao terminar fica
   // descartado pra sempre, sem tentar de novo sozinho quando conectar.
   useEffect(() => {
-    if (!qzConectado || !impressoraNome) return
+    if (!qzConectado || !config?.impressoraNome) return
     for (const pedido of pedidos) {
       if (pedido.impresso_em || jaTentados.current.has(pedido.id)) continue
       jaTentados.current.add(pedido.id)
       imprimir(pedido)
     }
-  }, [pedidos, imprimir, qzConectado, impressoraNome])
+  }, [pedidos, imprimir, qzConectado, config])
 
   const bloqueio = bloqueioDoPainel(painel, 'Impressora')
   if (bloqueio) return bloqueio
@@ -197,7 +211,7 @@ export default function Impressora() {
         </span>
       </Cabecalho>
 
-      {!impressoraNome && (
+      {config && !config.impressoraNome && (
         <p className="px-6 py-4 text-xl font-bold text-white" style={{ backgroundColor: ALERTA }}>
           Nenhuma impressora configurada para esta loja (falta impressora_nome em
           estabelecimentos.config).
