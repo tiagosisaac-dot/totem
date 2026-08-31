@@ -27,6 +27,35 @@ const SELECT_PEDIDO =
   'id, senha, nome_cliente, tipo_consumo, total, criado_em, impresso_em, ' +
   'pedido_itens(id, nome_snap, quantidade, combo_pai_id, pedido_item_opcoes(nome_snap))'
 
+// Lista do que foi pedido, pra equipe conferir com o cliente antes de
+// imprimir — mesma logica de combo/opcoes do cupom (cupom.js).
+function ItensDoPedido({ pedido }) {
+  const principais = pedido.pedido_itens.filter((i) => !i.combo_pai_id)
+  const filhosDe = (id) => pedido.pedido_itens.filter((i) => i.combo_pai_id === id)
+
+  return (
+    <ul className="mt-1 flex flex-col gap-1">
+      {principais.map((item) => (
+        <li key={item.id} className="text-lg">
+          <span className="font-semibold">
+            {item.quantidade}x {item.nome_snap}
+          </span>
+          {(item.pedido_item_opcoes ?? []).map((opcao, i) => (
+            <span key={i} className="block pl-5 text-base opacity-70">
+              + {opcao.nome_snap}
+            </span>
+          ))}
+          {filhosDe(item.id).map((filho) => (
+            <span key={filho.id} className="block pl-5 text-base opacity-70">
+              → {filho.nome_snap}
+            </span>
+          ))}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export default function Impressora() {
   const { slug } = useParams()
   const painel = useLojaLogada(slug)
@@ -223,10 +252,10 @@ export default function Impressora() {
             {pedidos.map((pedido) => (
               <li
                 key={pedido.id}
-                className="flex flex-wrap items-center gap-4 rounded-2xl border-4 p-4"
+                className="flex flex-col gap-3 rounded-2xl border-4 p-4"
                 style={{ borderColor: `${corTexto}22` }}
               >
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                   <p className="text-2xl font-bold">
                     {pedido.nome_cliente}{' '}
                     <span className="text-lg font-normal opacity-60">
@@ -234,20 +263,23 @@ export default function Impressora() {
                       {pedido.senha}
                     </span>
                   </p>
-                  <p className="text-xl opacity-70">{emReais(pedido.total)}</p>
+                  <ItensDoPedido pedido={pedido} />
+                  <p className="mt-2 text-xl font-bold opacity-80">{emReais(pedido.total)}</p>
                 </div>
 
-                <span className="text-lg font-bold opacity-60">
-                  {pedido.impresso_em ? 'Já foi pra cozinha' : 'Aguardando pagamento no caixa'}
-                </span>
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="text-lg font-bold opacity-60">
+                    {pedido.impresso_em ? 'Já foi pra cozinha' : 'Aguardando pagamento no caixa'}
+                  </span>
 
-                <button
-                  onClick={() => imprimir(pedido)}
-                  className="min-h-[60px] rounded-xl px-5 text-xl font-bold text-white active:scale-95"
-                  style={{ backgroundColor: pedido.impresso_em ? '#16A34A' : ALERTA }}
-                >
-                  {pedido.impresso_em ? 'Reimprimir' : 'Imprimir'}
-                </button>
+                  <button
+                    onClick={() => imprimir(pedido)}
+                    className="min-h-[60px] rounded-xl px-5 text-xl font-bold text-white active:scale-95"
+                    style={{ backgroundColor: pedido.impresso_em ? '#16A34A' : ALERTA }}
+                  >
+                    {pedido.impresso_em ? 'Reimprimir' : 'Imprimir'}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
