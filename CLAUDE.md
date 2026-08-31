@@ -247,10 +247,26 @@ sai pequena, só referência — não é o destaque (decisão do Isaac).
 * **Sem certificado configurado**: o QZ Tray vai pedir pra autorizar a conexão
 na primeira vez (aviso de "site não confiável"). É esperado — aceitar e marcar
 "lembrar" se o programa oferecer essa opção.
-* **O que falta**: Isaac instalar o QZ Tray no computador da loja, configurar a
-i9, rodar o SQL do nome da impressora, e testar um pedido de verdade. O formato
-do cupom é ponto de partida razoável (i9 aceita ESC/POS), mas só se ajusta
-vendo o papel sair — esperado precisar de 1-2 ajustes.
+* **Permissão "Apps no dispositivo" do Chrome (descoberto em 31/08/2026,
+testando em `localhost` vs. no site publicado).** Chrome recente bloqueia por
+padrão qualquer site publicado (https, fora do próprio computador) de acessar
+coisas no `localhost` — é o que o QZ Tray usa pra conversar com o navegador.
+Sem isso, a tela fica presa em "QZ Tray não encontrado", mesmo com o QZ Tray
+rodando certinho (em `localhost:5173` conecta liso, porque local-com-local não
+é bloqueado — foi assim que descobrimos a causa). **Não tem flag nem política
+de registro que resolva isso** (tentamos `chrome://flags` e a política
+`InsecurePrivateNetworkRequestsAllowedForUrls` — as duas não existem mais nessa
+versão do Chrome). O que resolve: clicar no cadeado/ícone ao lado do endereço
+do site → **"Apps no dispositivo"** → trocar de "Bloquear" para "Permitir". É
+por site E por computador/navegador — **precisa repetir esse passo em toda
+máquina nova** que abrir `/impressora` (inclusive no(s) computador(es) da
+loja). Fica registrado no Chrome depois de feito uma vez, não precisa repetir
+a cada pedido nem a cada abertura da aba.
+* **O que falta**: Isaac instalar o QZ Tray no computador da loja (**lembrar de
+liberar "Apps no dispositivo" pro site nesse Chrome também**), configurar a i9,
+rodar o SQL do nome da impressora, e testar um pedido de verdade. O formato do
+cupom é ponto de partida razoável (i9 aceita ESC/POS), mas só se ajusta vendo o
+papel sair — esperado precisar de 1-2 ajustes.
 
 \---
 
