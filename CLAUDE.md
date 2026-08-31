@@ -43,7 +43,7 @@ O primeiro cliente é um piloto real, com garçom levando o pedido à mesa.
 |Dispositivo|Tablet **Android** em modo quiosque|maquininha só integra em Android|
 
 **Não é app nativo.** É web app rodando em tela cheia. Um código só serve o
-totem, o KDS da cozinha, o painel do dono e o painel de chamada de senha.
+totem, a tela de impressão da cozinha e o painel do dono.
 
 \---
 
@@ -61,8 +61,8 @@ totem, o KDS da cozinha, o painel do dono e o painel de chamada de senha.
 
 > \*\*REGRA 4 — Datas no fuso do estabelecimento, não em UTC.\*\*
 > `(now() at time zone fuso)::date`. Em UTC, "hoje" vira "amanhã" às 21h —
-> no meio do movimento da hamburgueria. Hoje isso decide se um número de
-> plaquinha ainda está bloqueado, e vai decidir todo relatório por dia.
+> no meio do movimento da hamburgueria. Hoje isso decide quando a senha
+> sequencial (`proxima\_senha`) zera, e vai decidir todo relatório por dia.
 
 > \*\*REGRA 5 — Imagem é redimensionada no navegador antes do upload.\*\*
 > Máx. 800px, convertida para WebP (\~60 KB). Foto de celular tem 4 MB;
@@ -89,13 +89,22 @@ projeto React rodando, Edge Function publicada. **Não recomece o setup.**
 
 Pronto e testado:
 
-* **Totem** (`/:slug`) — cardápio, opções, combos, carrinho, número da mesa,
-confirmação, envio, limpeza por inatividade
-* **Edge Function `criar-pedido`** — publicada; recusa fraude de total, número em
-uso e item esgotado
-* **Cozinha** (`/:slug/cozinha`) — tempo real, um toque ("Pronto")
-* **Balcão** (`/:slug/balcao`) — "Entregue", "Devolvida", contador de plaquinhas
+* **Totem** (`/:slug`) — cardápio, opções, combos, carrinho, nome do cliente +
+comer aqui/para levar, confirmação, envio, limpeza por inatividade
+* **Edge Function `criar-pedido`** — publicada; recusa fraude de total e item
+esgotado
 * **Painel do dono** (`/:slug/admin`) — esgotar/reativar e mudar preço
+
+**Em andamento (29/08/2026), ainda sem teste na loja:**
+
+* **Impressão** (`/:slug/impressora`) — sem tela de cozinha nem de balcão para
+o Adorável Burguer: o pedido sai IMPRESSO na Bematech i9 (a mesma do Anota Aí),
+via QZ Tray (ponte local, roda no computador da loja ligado por USB na
+impressora). Ver "Impressão do pedido" mais abaixo — falta o Isaac instalar o
+QZ Tray e testar na impressora física.
+* **Cozinha e Balcão foram REMOVIDOS do código** (`/:slug/cozinha`,
+`/:slug/balcao` não existem mais) — decisão de 29/08/2026, junto com a saída da
+mesa/plaquinha do fluxo.
 
 **Migrations rodam à mão.** Os arquivos `supabase/migracao\_00N\_*.sql` são colados
 por Isaac no SQL Editor do painel; não usamos `supabase db push`. Ao criar uma
@@ -103,7 +112,11 @@ migration nova: escrever o arquivo, pedir para ele rodar, **e só publicar Edge
 Function que dependa dela depois** — senão o totem quebra no intervalo.
 Já rodadas: 002 (plaquinha), 003 (devolução), 004 (cardápio ao vivo),
 005 (só dono edita cardápio — confirmado em 15/08/2026 conferindo `pg_policies`),
-006 (heartbeat).
+006 (heartbeat), 007 (coluna `depende_da_opcao_id`, grupo de opção condicional
+do combo — confirmada em 27/08/2026, junto com a republicação da Edge Function
+`criar-pedido` e o `combo_transformar_burger.sql`).
+**008 (nome do cliente + tipo de consumo + impressão, tira mesa/plaquinha do
+fluxo) — escrita em 29/08/2026, AINDA NÃO RODADA pelo Isaac.**
 
 **Cardápio de teste: APAGADO em 20/08/2026.** Os ids que começavam com
 `00000000-0000-4000-8000-` eram falsos (`supabase/seed\_teste\_dev.sql`) e saíram
@@ -116,10 +129,13 @@ Apagar produto não apaga pedido antigo: `pedido\_itens.produto\_id` é
 Categoria `a1e7d3c4-5b62-4f18-9a03-7c2e8d1b4f60`. Junto veio o grupo
 "Turbine seu burger" (blend extra +R$ 9,50), ligado aos 15 de uma vez — é o
 mecanismo de grupo reutilizável, mudar o preço amanhã é uma linha só.
-**Ainda falta:** bebidas, porções e o combo (+R$ 15). O combo não é produto,
-é escolha ("transforme SEU burger"), então vira grupo reutilizável quando as
-bebidas existirem. Conferido pela API em 20/08/2026: 1 categoria, 15 produtos,
-1 grupo — nada de teste sobrou no banco.
+**Combo, bebidas, batata frita e milkshake: prontos e funcionando (27/08/2026).**
+O combo é escolha condicional, não produto: marcar "Transformar em combo" libera
+(e passa a exigir) o grupo "Bebida do combo" — sem a opção marcada, não dá pra
+escolher a bebida e pagar errado. Mecanismo é a migração 007 (coluna
+`depende_da_opcao_id`) + lógica nova em `Produto.jsx` e na Edge Function
+`criar-pedido`. Batata frita (5) e milkshake (5 sabores) entraram por foto do
+impresso, ainda sem foto própria no totem.
 
 \---
 
@@ -137,13 +153,18 @@ id `0d8ce944-a60e-469f-8dd5-622595fcab88`.
 Isaac. O token e o chat id vivem como **segredos da Edge Function** (`supabase
 secrets set`), nunca no repositório. Trocar para WhatsApp um dia = reescrever só
 `supabase/functions/\_shared/telegram.ts`; quem chama não muda.
+**Decisão (28/08/2026): manter Telegram por enquanto.** WhatsApp não tem
+equivalente simples e gratuito a um bot do Telegram — precisaria da API oficial
+da Meta (cadastro de empresa + modelo de mensagem pré-aprovado) ou de um serviço
+não-oficial tipo CallMeBot (simples, mas pode parar de funcionar sem aviso).
+Reavaliar se o Isaac parar de checar o Telegram no dia a dia.
 
 **Logins da equipe (ambiente dev).** As senhas são só do Isaac; não estão aqui e
 não devem estar:
 
 |Usuário|Papel|Acessa|
 |-|-|-|
-|`cozinha@adoravelburguer.com.br`|`cozinha`|`/cozinha` e `/balcao`|
+|`cozinha@adoravelburguer.com.br`|`cozinha`|`/impressora`|
 |`dono@adoravelburguer.com.br`|`dono`|`/admin`|
 
 > \*\*O Claude não consegue testar tela com login.\*\* Ele não tem as senhas, de
@@ -162,8 +183,8 @@ não devem estar:
 `aceita\_pedidos` (dono pausa o totem), `fuso`, `config` jsonb
 * `perfis` — liga `auth.users` a um estabelecimento. Papéis:
 `superadmin` (Isaac), `dono`, `cozinha`
-* `mesas` — os números de plaquinha válidos. Serve para barrar erro de digitação
-(mesa 99 numa loja com 40 plaquinhas)
+* `mesas` — **SEM USO** desde 29/08/2026. Era a lista de plaquinhas válidas;
+o modelo atual não usa mesa nem plaquinha. Ficou na tabela por segurança
 * `categorias`, `produtos` — cardápio. `produtos.disponivel` = botão "esgotou"
 * `grupos\_opcoes` + `opcoes` + `produto\_grupos` — personalização **reutilizável**.
 Tipos: `adicional` (soma preço), `remocao` (sem cebola), `escolha` (ponto da carne).
@@ -171,12 +192,14 @@ Um grupo serve vários produtos: mudar o preço do bacon = editar 1 linha
 * `combo\_slots` + `combo\_slot\_produtos` — combo é produto que contém produtos.
 Mecanismo diferente de adicional, não confunda
 * `pedidos`, `pedido\_itens`, `pedido\_item\_opcoes` — com snapshots.
-`pedidos.mesa\_numero` = a plaquinha digitada, é a identificação do pedido.
-`pedidos.alerta\_reuso\_em` = alguém tentou usar esse número enquanto o pedido
-estava aberto; o KDS destaca para a equipe confirmar a entrega
-* `contadores\_senha` + `proxima\_senha(uuid)` — **SEM USO.** Ficaram para o caso
-de um cliente futuro preferir senha sequencial em vez de plaquinha. `pedidos.senha`
-fica nulo
+`pedidos.nome\_cliente` (digitado no totem) e `pedidos.tipo\_consumo`
+(`local`/`levar`) são a identificação do pedido — sem mesa.
+`pedidos.impresso\_em` marca quando o cupom saiu na cozinha (nulo = falta
+imprimir). `pedidos.mesa\_numero` e `pedidos.alerta\_reuso\_em` **SEM USO**
+desde 29/08/2026 (eram do modelo de plaquinha)
+* `contadores\_senha` + `proxima\_senha(uuid)` — **voltou a ter uso em
+29/08/2026.** `pedidos.senha` é preenchido a cada pedido do totem, mas é só
+contagem interna do dia — não aparece grande em tela nem no cupom
 
 **Funções auxiliares de RLS:** `meu\_estabelecimento()`, `sou\_superadmin()`
 
@@ -186,7 +209,7 @@ Leitura pública (é cardápio, não é sigiloso). Escrita só na própria pasta
 O dono NUNCA recebe credencial do bucket — sobe pelo painel, o backend
 decide o caminho a partir do token dele.
 
-**Realtime ligado** em `pedidos` e `pedido\_itens` (para o KDS).
+**Realtime ligado** em `pedidos` e `pedido\_itens` (para a tela de impressão).
 
 **`totem\_heartbeat`** — uma linha por estabelecimento, com `ultimo\_ping` e
 `alertado\_em`. O totem manda sinal a cada minuto (`useHeartbeat` →
@@ -198,39 +221,70 @@ totem de propósito não é queda.
 
 \---
 
+## Impressão do pedido (QZ Tray) — 29/08/2026, ainda não testada na loja
+
+O Adorável Burguer não usa tela de cozinha nem plaquinha: o pedido do totem sai
+**impresso na Bematech i9**, a mesma impressora onde já saem os pedidos do
+Anota Aí. Como a i9 está ligada por **USB num computador** da loja (não em
+rede), o navegador sozinho não alcança — precisa de uma ponte local.
+
+**Ponte escolhida: QZ Tray.** Programa grátis, instala uma vez no computador da
+loja. Depois disso, basta deixar uma aba do navegador aberta em
+`/:slug/impressora` **naquele computador** (login com `cozinha@...`, mesmo
+usuário de sempre) — ela conecta no QZ Tray sozinha e manda imprimir a cada
+pedido novo.
+
+* `estabelecimentos.config.impressora\_nome` (jsonb, sem migração nova) guarda
+o nome EXATO que o Windows dá à impressora depois de instalado o QZ Tray —
+REGRA 1, nada fixo no código. Ver `supabase/configura\_impressora\_adoravelburguer.sql`.
+* `pedidos.impresso\_em` evita reimprimir sozinho o mesmo pedido; a tela tem
+botão **"Reimprimir"** em cada linha, porque papel emperra e acaba — nunca
+falha silenciosa.
+* Cupom em ESC/POS cru (`app/src/lib/cupom.js`): cabeçalho "PEDIDO TOTEM",
+nome do cliente em destaque, "COMER AQUI"/"PARA LEVAR", itens, total. A senha
+sai pequena, só referência — não é o destaque (decisão do Isaac).
+* **Sem certificado configurado**: o QZ Tray vai pedir pra autorizar a conexão
+na primeira vez (aviso de "site não confiável"). É esperado — aceitar e marcar
+"lembrar" se o programa oferecer essa opção.
+* **O que falta**: Isaac instalar o QZ Tray no computador da loja, configurar a
+i9, rodar o SQL do nome da impressora, e testar um pedido de verdade. O formato
+do cupom é ponto de partida razoável (i9 aceita ESC/POS), mas só se ajusta
+vendo o papel sair — esperado precisar de 1-2 ajustes.
+
+\---
+
 ## Fase 1 — escopo fechado
 
 Não construa nada fora desta lista. O piloto precisa ir ao ar.
 
 1. **Totem** (`/:slug`) — categorias → produto → personalização → carrinho
-→ digita o número da plaquinha → confirma
+→ comer aqui/para levar + nome do cliente → confirma
 2. **Edge Function `criar-pedido`** — valida, recalcula total ✅ *pronta*
-3. **KDS** (`/:slug/cozinha`) — pedidos em tempo real, número da mesa em destaque,
-maior que o nome do produto. **A cozinha toca UMA vez ("Pronto")** — mão
-engordurada não volta na tela. O garçom toca "Entregue" e depois "Devolvida"
-(é a devolução que libera o número, não a entrega)
+3. **Impressão** (`/:slug/impressora`) — pedido sai impresso na cozinha via QZ
+Tray, sem tela de cozinha nem plaquinha (ver seção "Impressão do pedido" acima)
 4. **Painel do dono** (`/:slug/admin`) — esgotar/reativar item, mudar preço
-5. **Pagamento: no caixa.** O cliente fala o número da mesa no caixa
+5. **Pagamento: no caixa.** O cliente fala o nome no caixa
 
 **Fora de escopo agora:** Pix, maquininha, relatórios, NFC-e, cadastro de
 cardápio pelo dono (Isaac cadastra no onboarding).
 
 \---
 
-## Fluxo do totem (piloto: garçom leva na mesa)
+## Fluxo do totem (29/08/2026: sem mesa, pedido impresso na cozinha)
 
-**O número do pedido é uma plaquinha física** que fica ao lado do totem. O
-cliente pega uma, deixa na mesa e digita o número **no fim** do pedido. O sistema
-não gera número sequencial — assim as plaquinhas voltam para a pilha em qualquer
-ordem e o dono não precisa organizar nada no fim do dia.
+**Não há plaquinha nem número de mesa.** Na última tela, o cliente escolhe
+**comer no local ou levar** e digita o **próprio nome** — é isso que sai no
+cupom impresso na cozinha e que a equipe/caixa usa pra identificar o pedido.
+O pedido ganha uma senha sequencial do dia só para contagem interna (não
+aparece grande em lugar nenhum).
 
 1. Tela inicial com a logo → "Toque para pedir"
 2. Categorias → produtos com foto e preço
 3. Produto → grupos de opções (obrigatórios primeiro) → adicionar
 4. Carrinho → revisar
-5. **Número da mesa**, teclado grande → **confirmar** ("Mesa 17, está certo?")
-6. "Pedido enviado. Mesa 17. Pague no caixa."
-7. Volta sozinho para a tela inicial após 15s
+5. **Comer aqui/para levar + nome**, teclado nativo do Android → **confirmar**
+6. "Pedido enviado. [Nome]. Pague no caixa."
+7. Volta sozinho para a tela inicial após 5s
 
 **Uma linha do carrinho = uma configuração com uma quantidade.** As opções
 escolhidas valem para a linha inteira: 3 hambúrgueres com blend extra são 3 com
@@ -255,12 +309,11 @@ tipo desktop.
 
 * **Queda de internet** — estado de erro claro, nunca aceitar pedido e perder
 * **Cliente desiste no meio** — timeout de inatividade limpa o carrinho
-* **Mesa errada** — confirmação explícita antes de enviar
-* **Número de plaquinha repetido** — recusa o pedido, manda pegar outra plaquinha
-e marca `alerta\_reuso\_em` no pedido antigo para o KDS destacar. O que bloqueia é
-`plaquinha\_devolvida\_em` estar nulo, **não** o status: o prato é entregue e a
-plaquinha continua na mesa. Só considera pedidos **de hoje**, senão os números vão
-sumindo até o totem travar
+* **Nome digitado errado** — confirmação explícita antes de enviar. Risco bem
+menor do que "mesa errada" era: nome trocado não manda comida pra estranho,
+só obriga a equipe a perguntar de novo no balcão
+* **Impressão falha** (papel emperrou/acabou) — nunca falha silenciosa: a tela
+`/impressora` mostra "Aguardando impressão" e tem botão "Reimprimir" por pedido
 * **Totem caiu** — heartbeat, Isaac precisa saber antes do dono ligar
 
 \---
@@ -284,7 +337,7 @@ de deploy — o que sobe é o que está no GitHub
 * **As chaves do Supabase em produção vivem no painel da Vercel**, não no
 repositório. `app/.env.local` é só da máquina do Isaac. Na Vercel o projeto tem
 **Root Directory = `app`** (sem isso o build falha sem explicar a causa) e
-`app/vercel.json` reescreve as rotas — sem ele, abrir `/:slug/cozinha` direto
+`app/vercel.json` reescreve as rotas — sem ele, abrir `/:slug/impressora` direto
 daria "página não encontrada"
 * **Publicar Edge Function:** `npx --yes supabase@latest functions deploy <nome>
 --project-ref mpcrwhaqrismnhblgvij`. Não precisa de `supabase link` nem de Docker
@@ -298,16 +351,31 @@ antiga. Não voltar. Reavaliar quando sair release com o patch
 
 ## Próximo passo
 
-A Fase 1 está fechada. Na fila, em ordem de risco:
+**Prioridade agora: colocar a impressão no ar.** Nesta ordem (ver seção
+"Impressão do pedido" acima):
+
+1. Isaac roda `migracao_008_senha_e_impressao.sql` no SQL Editor
+2. `git push` (Vercel publica: totem sem mesa, cozinha/balcão removidas, tela
+`/impressora` nova)
+3. Republicar a Edge Function `criar-pedido`
+4. Isaac instala o QZ Tray no computador da loja, configura a i9, roda
+`supabase/configura\_impressora\_adoravelburguer.sql` com o nome exato da
+impressora
+5. Abrir `/adoravelburguer/impressora` nesse computador, logar, aceitar o QZ
+Tray, testar um pedido de verdade e ajustar o cupom (`app/src/lib/cupom.js`)
+conforme o que sair no papel
+
+Depois disso, a fila antiga da Fase 1 (todos já feitos):
 
 1. ~~Restringir alteração de preço ao dono~~ — **feito** (migração 005, confirmada
 15/08/2026: só `dono` tem policy de insert/update/delete em produtos, categorias,
 grupos\_opcoes e opcoes; leitura continua pública)
 2. **Cardápio real do Adorável Burguer** — hambúrgueres **feitos** (15/08/2026),
 cardápio de teste **apagado** e as **15 fotos no ar** (20/08/2026, conferidas
-byte a byte pela API pública). Falta o resto do impresso (bebidas, porções,
-combo), que depende de foto das outras páginas
-3. **Deploy na Vercel** com as variáveis de ambiente
+byte a byte pela API pública). Bebidas, combo, batata frita e milkshake
+**feitos e funcionando** (27/08/2026). Batata e milkshake ficam sem foto por
+decisão do Isaac (28/08/2026), não é pendência
+3. ~~Deploy na Vercel~~ — **feito**, no ar em `totem-vert.vercel.app/adoravelburguer`
 4. ~~Heartbeat~~ — **feito** (migração 006 + Edge Functions `ping` e
 `verificar-heartbeat`, testadas de ponta a ponta em 15/08/2026).
 **A conferência está PAUSADA** (`cron.unschedule`): sem tablet ligado o dia
@@ -318,6 +386,7 @@ critério de sucesso do piloto, e como o dono chama o suporte no meio do movimen
 
 **Princípio que apareceu várias vezes e vale repetir:** ação que mexe no dinheiro
 ou no pedido do cliente é sempre explícita, nunca silenciosa. Confirmação do
-número da mesa, botão "Alterar preço", item esgotado que fica marcado em vez de
-sumir do carrinho — é a mesma regra nos três casos.
+nome antes de enviar, botão "Alterar preço", item esgotado que fica marcado em
+vez de sumir do carrinho, botão "Reimprimir" em vez de reimprimir sozinho sem
+avisar — é a mesma regra em todos os casos.
 

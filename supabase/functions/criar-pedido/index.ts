@@ -8,13 +8,16 @@
 // O totem manda apenas ESCOLHAS (ids). Se mandar um campo
 // "total", "preco" ou parecido, e simplesmente ignorado.
 //
-// O numero da mesa e a plaquinha que o cliente pegou ao lado do totem
-// e digitou no fim do pedido. O sistema NAO gera numero sequencial.
+// Sem mesa: o cliente digita o proprio nome e escolhe comer no local
+// ou levar. O pedido sai impresso na cozinha com esses dois dados.
+// A 'senha' e so um contador interno do dia (proxima_senha), nao
+// aparece grande em lugar nenhum — serve pra conferencia no fim do dia.
 //
 // Entrada esperada (POST, JSON):
 // {
 //   "slug": "adoravelburguer",
-//   "mesa_numero": 17,
+//   "nome_cliente": "Joana",
+//   "tipo_consumo": "local",                 // "local" | "levar"
 //   "observacao": "sem pressa",              // opcional
 //   "itens": [
 //     {
@@ -29,7 +32,7 @@
 //   ]
 // }
 //
-// Saida: { "pedido_id": "uuid", "mesa_numero": 17, "total": "48.50" }
+// Saida: { "pedido_id": "uuid", "senha": 12, "total": "48.50" }
 // ============================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -184,7 +187,7 @@ Deno.serve(async (req) => {
     // ========================================================
     const { data: estab, error: erroEstab } = await sb
       .from('estabelecimentos')
-      .select('id, nome, ativo, bloqueado, mensagem_bloqueio, aceita_pedidos, fuso')
+      .select('id, nome, ativo, bloqueado, mensagem_bloqueio, aceita_pedidos')
       .eq('slug', slug)
       .maybeSingle()
 
@@ -198,77 +201,17 @@ Deno.serve(async (req) => {
     }
 
     // ========================================================
-    // 3. NUMERO DA MESA (a plaquinha que o cliente pegou)
+    // 3. NOME DO CLIENTE E TIPO DE CONSUMO
     //
-    // E a identificacao do pedido: fica na mesa para o garcom achar,
-    // e e o que o cliente fala no caixa. Por isso e obrigatorio.
+    // Sem mesa: e o nome que identifica o pedido pra equipe e pro
+    // cliente no caixa. Tipo de consumo decide se embala pra levar.
     // ========================================================
-    const mesaNumero = Number(corpo.mesa_numero)
-    if (!Number.isInteger(mesaNumero) || mesaNumero < 1) {
-      throw new ErroPedido('Informe o número da mesa.')
-    }
+    const nomeCliente = texto(corpo.nome_cliente, 60)
+    if (!nomeCliente) throw new ErroPedido('Informe o nome para o pedido.')
 
-    // barra erro de digitacao: mesa 99 numa loja com 40 plaquinhas
-    const { data: mesa, error: erroMesa } = await sb
-      .from('mesas')
-      .select('numero')
-      .eq('estabelecimento_id', estab.id)
-      .eq('numero', mesaNumero)
-      .eq('ativa', true)
-      .maybeSingle()
-
-    if (erroMesa) throw erroMesa
-    if (!mesa) throw new ErroPedido(`Mesa ${mesaNumero} não existe. Confira o número.`)
-
-    // ---- essa plaquinha ainda esta fora? ----
-    //
-    // O que bloqueia NAO e o status do pedido: e a plaquinha nao ter
-    // voltado para a pilha. O prato pode ja ter sido entregue e a
-    // plaquinha continuar na mesa do cliente.
-    //
-    // E isso que pega o cliente que pega a plaquinha 9, le como 6 e
-    // digita 6: se a 6 estiver na mao de outra pessoa, o totem recusa.
-    const { data: emAberto, error: erroAberto } = await sb
-      .from('pedidos')
-      .select('id, criado_em')
-      .eq('estabelecimento_id', estab.id)
-      .eq('mesa_numero', mesaNumero)
-      .is('plaquinha_devolvida_em', null)
-      .neq('status', 'cancelado')
-
-    if (erroAberto) throw erroAberto
-
-    // REGRA 4: o dia e o do fuso do estabelecimento, nao UTC.
-    // So pedido aberto DE HOJE bloqueia o numero. Se a equipe esqueceu
-    // de marcar entrega ontem, a plaquinha volta a funcionar hoje —
-    // senao os numeros iriam sumindo um a um ate o totem travar.
-    const diaLocal = (quando: Date) =>
-      new Intl.DateTimeFormat('en-CA', {
-        timeZone: estab.fuso,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(quando)
-
-    const hoje = diaLocal(new Date())
-    const conflitos = (emAberto ?? []).filter((p) => diaLocal(new Date(p.criado_em)) === hoje)
-
-    if (conflitos.length > 0) {
-      // marca o pedido antigo para o KDS destacar: a equipe precisa
-      // confirmar a entrega para liberar o numero
-      await sb
-        .from('pedidos')
-        .update({ alerta_reuso_em: new Date().toISOString() })
-        .in(
-          'id',
-          conflitos.map((p) => p.id),
-        )
-
-      throw new ErroPedido(
-        `A mesa ${mesaNumero} já está em uso por outro pedido. ` +
-          `Pegue outra plaquinha e tente novamente.`,
-        409,
-      )
+    const tipoConsumo = corpo.tipo_consumo
+    if (tipoConsumo !== 'local' && tipoConsumo !== 'levar') {
+      throw new ErroPedido('Informe se o pedido é para comer no local ou para levar.')
     }
 
     // ========================================================
@@ -546,22 +489,31 @@ Deno.serve(async (req) => {
     // ========================================================
     // 6. GRAVAR
     //
-    // Sem chamar proxima_senha: o numero do pedido e a plaquinha que
-    // o cliente digitou. A coluna 'senha' fica vazia de proposito.
+    // senha vem de proxima_senha: e so um contador do dia pro Isaac
+    // conferir no fim do dia quantos pedidos saíram pelo totem — não
+    // aparece em telao nem é chamado em voz alta. Quem identifica o
+    // pedido na cozinha e no caixa e o nome do cliente.
     // Se qualquer parte falhar, apaga o pedido inteiro: melhor
     // "tente de novo" que meio pedido na cozinha.
     // ========================================================
+    const { data: senha, error: erroSenha } = await sb.rpc('proxima_senha', {
+      p_estabelecimento: estab.id,
+    })
+    if (erroSenha) throw erroSenha
+
     const { data: pedido, error: erroPedido } = await sb
       .from('pedidos')
       .insert({
         estabelecimento_id: estab.id,
-        mesa_numero: mesaNumero,
+        senha,
+        nome_cliente: nomeCliente,
+        tipo_consumo: tipoConsumo,
         total: paraReais(totalCentavos), // calculado AQUI, nunca recebido
         forma_pagamento: 'caixa',
         observacao: texto(corpo.observacao),
         origem: 'totem',
       })
-      .select('id, mesa_numero')
+      .select('id, senha, nome_cliente, tipo_consumo')
       .single()
 
     if (erroPedido) throw erroPedido
@@ -615,7 +567,9 @@ Deno.serve(async (req) => {
 
     return resposta({
       pedido_id: pedido.id,
-      mesa_numero: pedido.mesa_numero,
+      senha: pedido.senha,
+      nome_cliente: pedido.nome_cliente,
+      tipo_consumo: pedido.tipo_consumo,
       total: paraReais(totalCentavos),
     })
   } catch (e) {

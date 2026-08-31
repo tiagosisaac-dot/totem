@@ -54,7 +54,7 @@ o cliente não paga desenvolvimento — paga assinatura.
 |---|---|---|
 | **Cliente final** | Faz o pedido no tablet | Ser rápido e óbvio. Está em pé, com pressa, pode ter 70 anos |
 | **Dono / gerente** | Marca item esgotado, ajusta preço, pausa o totem | Resolver sozinho, sem ligar para o suporte |
-| **Cozinha** | Vê o pedido, marca como pronto | Ler de longe, com a mão suja, sem clicar em coisa errada |
+| **Cozinha** | Recebe o pedido impresso na hora (Adorável Burguer: 29/08/2026 em diante, sem tela) | Papel chegando junto com os pedidos do Anota Aí, identificado, sem precisar olhar tablet |
 | **Isaac (superadmin)** | Cadastra cliente novo, monta cardápio no onboarding, cobra, bloqueia inadimplente | Saber que caiu antes do dono ligar reclamando |
 
 ---
@@ -80,17 +80,14 @@ o cliente não paga desenvolvimento — paga assinatura.
 
 Escopo fechado. O piloto precisa ir ao ar; nada fora desta lista entra agora.
 
-1. **Totem** (`/:slug`) — mesa → categorias → produto → personalização → carrinho
-   → confirmação → senha
+1. **Totem** (`/:slug`) — categorias → produto → personalização → carrinho →
+   comer aqui/para levar + nome do cliente → confirmação
 2. **Cálculo de preço no servidor** — Edge Function `criar-pedido`
-3. **KDS** (`/:slug/cozinha`) — pedidos em tempo real, número da mesa em destaque.
-   Divisão de trabalho deliberada: a **cozinha toca uma vez só** ("Pronto"), porque
-   mão engordurada não volta na tela. O **garçom** toca "Entregue" ao levar o prato
-   e "Devolvida" ao recolher a plaquinha. Contador de plaquinhas livres no alto,
-   para a equipe recolher antes de acabar — e não descobrir quando o totem recusar
-   um cliente
+3. **Impressão do pedido** — no piloto do Adorável Burguer (decisão de
+   29/08/2026), o pedido sai impresso na cozinha (mesma impressora do sistema
+   que já usam), sem tela de cozinha/balcão nem mesa/plaquinha. Ver seção 8
 4. **Painel do dono** (`/:slug/admin`) — esgotar/reativar item, mudar preço
-5. **Pagamento no caixa.** O totem só emite senha
+5. **Pagamento no caixa.** O cliente fala o nome
 
 ### Fora de escopo agora (e por quê)
 
@@ -100,21 +97,18 @@ Escopo fechado. O piloto precisa ir ao ar; nada fora desta lista entra agora.
 | Relatórios de venda | O dono do piloto não pediu. Os dados estão sendo gravados; o relatório pode vir depois sem retrabalho |
 | NFC-e / fiscal | Exige contador e certificado. Não bloqueia o piloto |
 | Cadastro de cardápio pelo dono | Isaac cadastra no onboarding. Fazer o dono cadastrar exige uma interface bem mais cuidadosa |
-| Chamada de senha em painel/TV | O piloto tem garçom levando à mesa |
-| App nativo | É web app em tela cheia. Um código serve totem, cozinha e painéis |
+| Chamada de senha em painel/TV | A senha é só contagem interna; a identificação do pedido é o nome do cliente no cupom impresso |
+| App nativo | É web app em tela cheia. Um código serve totem, impressão e painéis |
 
 ---
 
 ## 7. O piloto
 
 * **Cliente:** Adorável Burguer (`adoravelburguer`)
-* **Operação:** cliente pede no totem, paga no caixa, **garçom leva o pedido à mesa**
-* **Plaquinhas:** 40 numeradas, ao lado do totem
-  * **A DEFINIR:** quem produz as plaquinhas e quanto custa
-  * **Quantidade é decisão de produto, não detalhe.** Plaquinhas suficientes para
-    girar uma noite inteira tornam a devolução opcional: se sobra número, esquecer
-    de devolver deixa de ter consequência. Medir no piloto quantas ficam em uso no
-    pico e dimensionar a partir daí
+* **Operação (decidida em 29/08/2026):** cliente pede no totem, escolhe comer no
+  local ou levar, digita o nome, paga no caixa. **Sem mesa nem plaquinha** — o
+  pedido sai impresso na cozinha (mesma impressora do Anota Aí), identificado
+  pelo nome; a equipe entrega chamando/procurando por nome
 * **Quantos tablets:** **A DEFINIR**
 * **Data de início:** **A DEFINIR**
 * **Duração antes de decidir se vira produto:** **A DEFINIR**
@@ -134,16 +128,22 @@ Sugestões de medida, escolher poucas:
 
 ## 8. Fluxo do cliente no totem
 
-### A plaquinha é o número do pedido
+> **Revisado em 29/08/2026.** As duas subseções antigas ("A plaquinha é o
+> número do pedido" e "Número já em uso") saíram: o Adorável Burguer não usa
+> mesa nem plaquinha física. Ficam registradas na seção 13, porque a plaquinha
+> continua sendo uma opção válida para um cliente futuro que prefira esse
+> modelo — `mesas` e a lógica de bloqueio só saíram do código deste cliente.
 
-Ao lado do totem fica uma pilha de plaquinhas numeradas. O cliente pega uma,
-deixa na mesa onde vai sentar e digita esse número **no fim** do pedido. O garçom
-encontra a mesa procurando a plaquinha; no caixa, o cliente fala esse número.
+### Sem mesa: nome do cliente identifica o pedido
 
-**O sistema não gera número sequencial.** Isso é deliberado: como o cliente pega
-qualquer plaquinha, elas voltam para a pilha em qualquer ordem, e ninguém precisa
-reorganizá-las no fim do dia. Coerente com a proposta do produto — o sistema tira
-trabalho do dono, não adiciona.
+Na última tela, o cliente escolhe **comer no local ou levar** e digita o
+**próprio nome**. Isso é o que sai destacado no cupom impresso na cozinha e o
+que a equipe/caixa usa para identificar o pedido — não há plaquinha, não há
+número de mesa, e o garçom não precisa saber onde o cliente sentou.
+
+O pedido ganha também uma senha sequencial do dia (`proxima_senha`), mas só
+como contagem interna para o dono conferir quantos pedidos saíram pelo totem —
+não aparece em destaque em tela nem no cupom.
 
 ### Fluxo
 
@@ -151,30 +151,17 @@ trabalho do dono, não adiciona.
 2. Categorias → produtos com foto e preço
 3. Produto → opções (obrigatórias primeiro) → adicionar ao carrinho
 4. Carrinho → revisar
-5. **Número da mesa** em teclado grande → confirmar ("Mesa 17, está certo?")
-6. "Pedido enviado. Mesa 17. Pague no caixa."
-7. Volta sozinho para a tela inicial após 15 segundos
+5. **Comer aqui/para levar + nome**, teclado nativo do tablet → confirmar
+6. "Pedido enviado. [Nome]. Pague no caixa."
+7. Volta sozinho para a tela inicial após 5 segundos
 
-### Número já em uso
+### Impressão na cozinha (sem tela de KDS)
 
-Um número fica bloqueado **desde o pedido até alguém marcar que a plaquinha voltou
-para a pilha** — não até a entrega. O prato sai e a plaquinha continua na mesa do
-cliente.
-
-Se o cliente digitar um número bloqueado, o pedido é **recusado** e a tela pede
-para pegar outra plaquinha. O pedido antigo é destacado na cozinha para a equipe
-conferir.
-
-**Por que tão rígido:** é isso que pega o cliente que pega a plaquinha 9, lê como
-6 e digita 6. Se a 6 estiver na mão de outra pessoa, o totem recusa em vez de
-criar dois pedidos com o mesmo número.
-
-**Solução física, mais barata que qualquer software:** marcar um ponto embaixo do
-número nas plaquinhas (`6.` e `9.`) elimina a confusão na origem.
-
-**Limite de segurança:** só bloqueia se o pedido for de **hoje**. Plaquinha
-esquecida ontem não trava o número hoje — senão os números iriam sumindo um a um
-até o totem recusar todo mundo.
+O pedido sai impresso direto na cozinha, na mesma impressora onde já saem os
+pedidos de outros canais da loja — sem tela de tempo real para acompanhar.
+Cabeçalho "PEDIDO TOTEM" e o nome do cliente em destaque evitam confundir com
+os pedidos de outro sistema. Papel pode emperrar ou acabar: existe um botão de
+reimprimir manual, nunca falha silenciosa.
 
 **Diretrizes de tela:** alvo de toque mínimo 60px, fonte grande, contraste alto.
 É usado em pé, com pressa, por gente de todas as idades. Nada de menu discreto
@@ -192,7 +179,7 @@ prejuízo real.
 | **Nada de dado de estabelecimento no código** | Cada cliente novo exigiria um deploy. O modelo SaaS deixa de funcionar |
 | **O total nunca é calculado no tablet** | Qualquer pessoa no wi-fi da loja manda pedido de R$ 0,00 |
 | **Pedido guarda cópia do nome e do preço** | Dono muda o preço amanhã e a venda de ontem muda junto. Histórico financeiro não pode ser reescrito |
-| **Data no fuso do estabelecimento** | Em UTC, "hoje" vira "amanhã" às 21h, no meio do movimento. Isso decide se uma plaquinha ainda está bloqueada e vai decidir todo relatório por dia |
+| **Data no fuso do estabelecimento** | Em UTC, "hoje" vira "amanhã" às 21h, no meio do movimento. Isso decide quando a senha sequencial do dia zera e vai decidir todo relatório por dia |
 | **Imagem redimensionada antes de subir** | Foto de celular tem 4 MB. 40 delas travam o tablet no wi-fi da loja |
 | **Toda tabela nasce com sua regra de acesso** | Consulta volta vazia sem erro e ninguém entende por quê |
 
@@ -204,9 +191,8 @@ prejuízo real.
 |---|---|
 | Queda de internet | Erro claro na tela. Nunca aceitar pedido que não foi gravado |
 | Cliente desiste no meio | Timeout de inatividade limpa o carrinho e volta ao início |
-| Mesa digitada errada | Confirmação explícita antes de enviar + o número é validado contra as plaquinhas cadastradas |
-| Plaquinha em uso por outro pedido | Recusa, pede outra plaquinha e destaca o pedido antigo na cozinha. Só considera pedidos de hoje, para não travar a loja |
-| Equipe não marca pedidos como entregues | O destaque na cozinha é o empurrão. O limite de "hoje" impede que o problema acumule para o dia seguinte |
+| Nome digitado errado | Confirmação explícita antes de enviar. Risco bem menor que mesa errada — nome trocado não manda comida pro lugar errado, só obriga perguntar de novo no balcão |
+| Impressão falha (papel emperrou/acabou) | Nunca falha silenciosa: tela de impressão mostra "aguardando" e tem botão "Reimprimir" por pedido |
 | Totem travado / offline | Heartbeat. Isaac precisa saber antes do dono ligar |
 | Item esgotado no meio do movimento | Botão "esgotou" no painel do dono, e o servidor recusa pedido de item indisponível |
 | Dono pede coisa fora de escopo durante o piloto | Este documento |
@@ -259,8 +245,8 @@ estabelecimentos. Não são dívida técnica — são escolhas conscientes com p
 |---|---|---|
 | **Só o dono marca item esgotado** | Em lanchonete pequena o dono está no salão durante o movimento | Cliente cujo dono não fica no salão. Aí a cozinha precisa marcar, e isso exige distinguir no banco "mudou disponibilidade" de "mudou preço", além de um botão na tela da cozinha |
 | **Quem pausa o totem** (`aceita_pedidos`) | Hoje qualquer usuário da loja pode. Não decidido de propósito | Pausar quando a cozinha está afogada é plausivelmente ação da cozinha, não do dono. Definir antes de fechar essa permissão |
-| **Plaquinha física em vez de senha sequencial** | Tira trabalho do dono: as plaquinhas voltam em qualquer ordem | Cliente que prefira senha chamada em voz alta. A função `proxima_senha` já existe no banco, sem uso, para esse caso |
-| **Cadastro de cardápio feito por Isaac** | Garante que o cardápio entre certo, e é oportunidade de conversar com o cliente | Quando o número de clientes tornar o onboarding manual o gargalo |
+| **Plaquinha física em vez de senha sequencial** | Foi a escolha original do piloto: tirava trabalho do dono, plaquinhas voltam em qualquer ordem | **Já revertida para o Adorável Burguer em 29/08/2026** — o dono preferiu tirar mesa/plaquinha de vez (impressão direto na cozinha, nome do cliente identifica). `proxima_senha` voltou a ser usada, mas só como contagem interna. Fica registrada aqui para um cliente futuro que prefira o modelo de plaquinha/mesa — nesse caso a lógica antiga (migrações 002/003) precisaria voltar, hoje o código não a usa mais |
+| **Cadastro de cardápio feito por Isaac** | Garante que o cardápio entre certo, e é oportunidade de conversar com o cliente | Quando o número de clientes tornar o onboarding manual o gargalo. Ideia levantada em 28/08/2026: página de edição de cardápio pelo dono (produto novo, categoria, foto) — não é só abrir o que já existe no painel (`/admin` hoje só esgota/reativa e muda preço), precisa decidir o que o dono pode mexer sem risco (ex: nunca deixar tocar em `estabelecimento_id`) |
 
 ---
 
@@ -273,3 +259,42 @@ estabelecimentos. Não são dívida técnica — são escolhas conscientes com p
 5. Depois da Fase 1, o que tem mais valor: pagamento no totem, relatório para o
    dono, ou cadastro de cardápio pelo próprio dono?
 6. Suporte: como o dono fala com Isaac quando algo dá errado no meio do movimento?
+
+---
+
+## 15. Checklist para efetivar o piloto na loja
+
+**Atualizado em 28/08/2026.** O sistema está pronto do lado do software — o
+pedido de ponta a ponta (com combo) já foi testado no site publicado e chegou
+certo na cozinha e no balcão. O que falta agora é físico, operacional e um
+punhado de decisões de negócio. Marcar conforme for resolvendo.
+
+### Físico / operacional
+
+- [ ] Tablet Android configurado em **modo quiosque** (travado no totem, sem
+      dar pra sair do app nem mexer nas configurações — normalmente com um
+      app tipo "Fully Kiosk Browser")
+- [ ] QZ Tray instalado no computador da loja ligado na Bematech i9, e
+      `estabelecimentos.config.impressora_nome` configurado (ver
+      `CLAUDE.md`, seção "Impressão do pedido")
+- [ ] Wi-fi da loja testado com o tablet físico (`npm --prefix app run
+      dev:rede`, ver `docs/ESTADO.md` seção 7 — só faz sentido com o tablet
+      em mãos)
+- [ ] Equipe treinada: a cozinha recebe o pedido já impresso (identificado
+      "PEDIDO TOTEM" + nome do cliente); dono usa `/admin` para esgotar item e
+      mudar preço
+
+### Decisões de negócio (A DEFINIR nas seções 5, 7 e 14)
+
+- [ ] Quantos tablets no piloto e onde ficam
+- [ ] Data de início e por quanto tempo roda antes de decidir se vira produto
+- [ ] Critério de sucesso definido (não avaliar por sensação no fim)
+- [ ] Quem paga o tablet — do dono, alugado, ou incluído na mensalidade
+- [ ] Canal de suporte combinado — como o dono chama o Isaac no meio do
+      movimento se o totem travar
+
+### No dia de ligar o tablet
+
+- [ ] Religar a conferência do heartbeat — comando no fim de
+      `supabase/migracao_006_heartbeat_totem.sql` (está pausado de propósito
+      até aqui, para não gerar alerta de "sem sinal" com o tablet desligado)

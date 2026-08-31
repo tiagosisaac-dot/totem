@@ -1,6 +1,6 @@
 # ESTADO — onde paramos
 
-> **Atualizado em 26/08/2026.**
+> **Atualizado em 29/08/2026.**
 > Este arquivo é o retrato do projeto num dia. O `CLAUDE.md` explica **como** as
 > coisas funcionam e **por quê**; aqui fica **até onde chegamos**. Quando os dois
 > discordarem, o `CLAUDE.md` está certo — é ele que é mantido junto do código.
@@ -9,9 +9,33 @@
 
 ## Em uma frase
 
-O totem está no ar, com o cardápio real de hambúrgueres e as 15 fotos, e o que
-falta é o resto do impresso, o piloto de verdade na loja e as decisões de
-negócio que ninguém tomou ainda.
+Mudança grande em 29/08/2026: **saiu mesa/plaquinha e as telas de cozinha e
+balcão** do Adorável Burguer. O cliente digita o próprio nome e escolhe
+comer aqui/levar; o pedido some numa nova tela `/impressora` que manda
+imprimir na Bematech i9 via QZ Tray. **Código pronto e commitado, mas ainda
+NADA disso rodou na loja de verdade** — falta o Isaac rodar a migração 008,
+publicar, e instalar/testar o QZ Tray na impressora física.
+
+---
+
+## 0. Mudança de 29/08/2026 — sem mesa, impressão em vez de tela (AINDA NÃO NO AR)
+
+Pedido do dono: papel impresso na Bematech i9 (mesma do Anota Aí) substitui de
+vez a tela de cozinha/balcão e a plaquinha física. Sem mesa: o cliente escolhe
+comer aqui/levar e digita o próprio nome, que sai no cupom. Código escrito e
+commitado nesta sessão — **falta rodar**:
+
+1. Isaac roda `supabase/migracao_008_senha_e_impressao.sql` no SQL Editor
+2. `git push` publica (totem sem mesa, `/cozinha` e `/balcao` removidas do
+   código, `/impressora` nova)
+3. Republicar a Edge Function `criar-pedido`
+4. Isaac instala o QZ Tray no computador da loja, configura a i9, roda
+   `supabase/configura_impressora_adoravelburguer.sql` com o nome exato
+5. Testar um pedido de verdade e ajustar `app/src/lib/cupom.js` conforme o
+   papel que sair — formato ainda **não visto saindo de uma impressora real**
+
+Detalhe técnico e o "porquê" de cada peça: `CLAUDE.md`, seção "Impressão do
+pedido (QZ Tray)".
 
 ---
 
@@ -19,14 +43,35 @@ negócio que ninguém tomou ainda.
 
 **Endereço:** `totem-vert.vercel.app/adoravelburguer`
 A Vercel republica sozinha a cada `git push`. Não existe passo de deploy.
+**A mudança da seção 0 ainda NÃO foi publicada** — o que está no ar hoje ainda
+é o fluxo com número de mesa e as telas de cozinha/balcão.
 
 * **Fase 1 fechada.** Tela inicial → cardápio → produto → carrinho → número da
   mesa → confirmação, e volta sozinho ao início.
 * **Cozinha e balcão** em lista, com cor avisando o pedido que atrasou.
-* **Cardápio real** do Adorável Burguer: 1 categoria, 15 hambúrgueres, 1 grupo
-  de opção ("Turbine seu burger"), 40 mesas.
+* **Cardápio real** do Adorável Burguer: 15 hambúrgueres, bebidas, 5 porções de
+  batata frita e 5 sabores de milkshake, 40 mesas.
+* **Combo funcionando.** Grupo de opção condicional: só aparece (e só é exigido)
+  escolher a bebida do combo depois de marcar "Transformar em combo" — antes
+  dava pra pegar a bebida sem pagar os R$15. Migração 007 + Edge Function
+  `criar-pedido` republicada + `combo_transformar_burger.sql` — os três passos
+  confirmados feitos pelo Isaac em 27/08/2026.
+* **Pedido testado de ponta a ponta em 28/08/2026, confirmado 100%.** Pedido de
+  combo (Saint Brie + Coca-Cola Normal, R$58,00) enviado pelo site publicado na
+  mesa 40: grupo condicional travou até escolher bebida, preço bateu, pedido
+  chegou certo tanto na cozinha quanto no balcão (confirmado pelo Isaac), e a
+  plaquinha foi devolvida normalmente. Loja estava aberta mas tablet e telas de
+  cozinha/balcão ainda não instalados fisicamente, sem risco pra operação.
+* **Carrinho:** dá pra tirar 1 de uma linha com 2+ iguais sem apagar a linha
+  inteira (**−**/**+**), e o adicional escolhido avisa que vale pra linha toda.
+  Também limpa (com confirmação, se tiver item) ao voltar pro início, e a
+  inatividade caiu de 75s para 25s.
 * **Cardápio de teste apagado** em 20/08/2026. Não sobrou nada de teste no banco.
-* **As 15 fotos** no Storage, ligadas aos produtos.
+* **Fotos dos 15 hambúrgueres** no Storage, ligadas aos produtos. Batata frita e
+  milkshake **ficam sem foto por decisão** (28/08/2026) — não é falta, é escolha
+  do Isaac por enquanto. O totem precisa mostrar bem esses produtos sem foto
+  (sem buraco/quebrado no cartão); se algum dia isso incomodar visualmente, é
+  o sinal pra revisitar a decisão, não bug.
 * **Só o dono edita preço** (migração 005). Cliente não tem essa policy.
 * **Heartbeat** pronto (migração 006), mas com a conferência **pausada** — ver
   seção 5.
@@ -86,41 +131,38 @@ em `Desktop\fotos-cardapio-totem\`. As 389 originais continuam intactas no zip.
 
 ---
 
-## 3. Feito mas NÃO publicado
+## 3. Bug que passou pela produção (corrigido)
 
-Três commits fechados, parados na máquina do Isaac. **O que está no ar não tem
-nada disso.**
+A migração 007 (coluna `depende_da_opcao_id`, para o grupo condicional do combo)
+criou um **segundo caminho** de relação entre `grupos_opcoes` e `opcoes`. O
+PostgREST passou a recusar (erro `PGRST201`, relação ambígua) a consulta que
+embute `opcoes` dentro de `grupos_opcoes` — isso **quebrou a abertura de
+qualquer produto** no site publicado, não só os do combo.
 
-| commit | o que é |
-|--------|---------|
-| `8111a1b` | registra a limpeza do cardápio de teste |
-| `86ad2f0` | liga as 15 fotos e registra as decisões |
-| `d29aeda` | **−** e **+** no carrinho, e o aviso do adicional |
+Corrigido nomeando a relação explicitamente (`opcoes!opcoes_grupo_id_fkey`) em
+`app/src/componentes/Produto.jsx`, commit `cc5d7e9`, testado direto contra a API
+antes do commit e já publicado.
 
-Para publicar: `git push`. A Vercel faz o resto em um ou dois minutos.
-
-O `d29aeda` conserta duas coisas que o Isaac achou testando: o **×** do carrinho
-apagava a linha inteira (não dava para tirar 1 de 2 iguais), e o adicional
-escolhido valia para todos os itens da linha sem avisar. Foi **testado no
-navegador** com o cardápio real. O **envio do pedido não foi testado** — gravaria
-pedido de verdade na cozinha.
+**Fica registrado como armadilha (seção 6) para a próxima migração que adicionar
+uma segunda FK entre duas tabelas que já se relacionam.**
 
 ---
 
 ## 4. O que falta para o piloto rodar
 
-1. **Fotos das outras páginas do impresso** (bebidas, porções). Sem elas o resto
-   do cardápio não entra, e sem o resto do cardápio o combo "+R$ 15" não tem como
-   existir — ele precisa da bebida cadastrada.
-2. **Religar a conferência do heartbeat.** Está pausada de propósito
+0. **Publicar a mudança de mesa/impressão da seção 0** — é a maior pendência
+   agora, ver os 5 passos lá em cima.
+1. **Religar a conferência do heartbeat.** Está pausada de propósito
    (`cron.unschedule`): sem tablet ligado o dia todo, "sem sinal" é o estado
    normal e o aviso vira ruído. O comando para religar está no fim de
    `supabase/migracao_006_heartbeat_totem.sql`. **Religar junto com o piloto.**
-3. **Tela de upload de foto pelo dono.** Hoje quem sobe foto é o Isaac, pelo
-   painel do Supabase. O dono nunca recebe credencial do bucket.
-4. **Testar o pedido de ponta a ponta** com a mudança do carrinho: pedir 2
-   iguais, tirar um, finalizar numa mesa, e conferir se a cozinha recebe 1 e se
-   o valor bate.
+2. **Tela de upload de foto pelo dono.** Hoje quem sobe foto é o Isaac, pelo
+   painel do Supabase. O dono nunca recebe credencial do bucket. **Obs:** isso
+   é parte de "cadastro de cardápio pelo dono", que o `docs/PRD.md` marca como
+   fora do escopo da Fase 1 — não é bloqueio real pro piloto, só ficou nessa
+   lista por engano.
+**Item "testar pedido de ponta a ponta com o combo real" saiu desta lista —
+confirmado 100% em 28/08/2026, ver seção 1.**
 
 ---
 
@@ -131,7 +173,9 @@ são elas que decidem se o piloto vira produto ou fica sendo favor.
 
 * **Mensalidade** — quanto custa por estabelecimento
 * **Tablet** — do dono, alugado, ou incluído no preço
-* **Plaquinhas de mesa** — quem produz e quanto custa
+* ~~Plaquinhas de mesa~~ — **não se aplica mais** (29/08/2026): o Adorável
+  Burguer não usa mesa nem plaquinha, o pedido é identificado por nome + cupom
+  impresso. Fica valendo só se um cliente futuro pedir o modelo antigo
 * **Piloto** — quantos tablets, data de início, quanto tempo antes de decidir
 * **Critério de sucesso** — o que precisa acontecer para valer a pena continuar
 * **Suporte** — como o dono chama alguém no meio do movimento, quando o totem
@@ -147,6 +191,13 @@ no ar. Separar dá trabalho e ainda não foi feito.
 
 Coisas que custaram tempo uma vez. Não custar duas vezes é o motivo deste arquivo.
 
+* **Segunda FK entre as mesmas duas tabelas quebra o PostgREST.** A migração
+  007 ligou `grupos_opcoes` e `opcoes` por um segundo caminho
+  (`depende_da_opcao_id`), e a consulta que embute uma tabela dentro da outra
+  passou a dar erro de relação ambígua (`PGRST201`) — quebrando o site inteiro,
+  não só a parte nova. **Toda consulta embutida (`select("*, opcoes(*)")`) que
+  envolver uma tabela com mais de uma FK para a outra precisa nomear a relação
+  explicitamente** (`opcoes!opcoes_grupo_id_fkey`). Ver seção 3.
 * **Caminho do Storage em maiúscula.** Uma pasta `Produtos` fez as 15 imagens
   darem 404 enquanto a listagem do painel dizia que estava tudo certo. A
   listagem não diferencia maiúscula, o endereço público diferencia. **Conferir

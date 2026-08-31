@@ -5,7 +5,7 @@
 // cores vem do BANCO, nunca escritos aqui (REGRA 1): e o mesmo
 // codigo servindo todos os clientes.
 //
-// Etapas: inicial -> cardapio -> produto -> carrinho -> mesa
+// Etapas: inicial -> cardapio -> produto -> carrinho -> identificacao
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -17,7 +17,7 @@ import { useCardapio, motivoEsgotado } from '../lib/useCardapio.js'
 import Cardapio from '../componentes/Cardapio.jsx'
 import Produto from '../componentes/Produto.jsx'
 import Carrinho from '../componentes/Carrinho.jsx'
-import NumeroMesa from '../componentes/NumeroMesa.jsx'
+import IdentificacaoPedido from '../componentes/IdentificacaoPedido.jsx'
 
 // Sem tocar em nada por este tempo, o totem pergunta se a pessoa
 // ainda esta ali; sem resposta, limpa e volta ao inicio.
@@ -184,9 +184,9 @@ export default function Totem() {
     </>
   )
 
-  if (etapa === 'mesa') {
+  if (etapa === 'identificacao') {
     return comAviso(
-      <NumeroMesa
+      <IdentificacaoPedido
         slug={slug}
         carrinho={carrinho}
         corTexto={corTexto}
@@ -233,7 +233,7 @@ export default function Totem() {
           )
           setAvisoEsgotado(null)
         }}
-        aoFinalizar={() => setEtapa('mesa')}
+        aoFinalizar={() => setEtapa('identificacao')}
       />,
     )
   }

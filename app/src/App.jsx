@@ -1,11 +1,10 @@
 // ============================================================
 // ENDERECOS DO SISTEMA
 //
-// Um codigo so serve os quatro destinos. O que muda e o endereco:
-//   /adoravelburguer          -> totem do salao
-//   /adoravelburguer/cozinha  -> so o que esta em producao
-//   /adoravelburguer/balcao   -> prontos + devolucao de plaquinha
-//   /adoravelburguer/admin    -> painel do dono
+// Um codigo so serve os destinos abaixo. O que muda e o endereco:
+//   /adoravelburguer            -> totem do salao
+//   /adoravelburguer/impressora -> imprime o pedido na cozinha (QZ Tray)
+//   /adoravelburguer/admin      -> painel do dono
 //
 // O 'slug' na frente e o que identifica de qual estabelecimento a
 // tela esta falando. Nenhum nome de loja aparece aqui (REGRA 1).
@@ -13,8 +12,7 @@
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Totem from './paginas/Totem.jsx'
-import Cozinha from './paginas/Cozinha.jsx'
-import Balcao from './paginas/Balcao.jsx'
+import Impressora from './paginas/Impressora.jsx'
 import Admin from './paginas/Admin.jsx'
 
 export default function App() {
@@ -22,8 +20,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/:slug" element={<Totem />} />
-        <Route path="/:slug/cozinha" element={<Cozinha />} />
-        <Route path="/:slug/balcao" element={<Balcao />} />
+        <Route path="/:slug/impressora" element={<Impressora />} />
         <Route path="/:slug/admin" element={<Admin />} />
         <Route path="*" element={<EnderecoInvalido />} />
       </Routes>

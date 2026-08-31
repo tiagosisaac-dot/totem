@@ -8,10 +8,11 @@
 
 import { supabase } from './supabase.js'
 
-export async function enviarPedido({ slug, mesaNumero, carrinho }) {
+export async function enviarPedido({ slug, nomeCliente, tipoConsumo, carrinho }) {
   const corpo = {
     slug,
-    mesa_numero: mesaNumero,
+    nome_cliente: nomeCliente,
+    tipo_consumo: tipoConsumo,
     itens: carrinho.map((item) => ({
       produto_id: item.produto.id,
       quantidade: item.quantidade,
@@ -35,7 +36,7 @@ export async function enviarPedido({ slug, mesaNumero, carrinho }) {
     // A funcao recusa com { erro: "..." } e status 4xx. O
     // supabase-js trata 4xx como erro e guarda a resposta crua
     // em error.context — e de la que vem a mensagem que o cliente
-    // precisa ler ("pegue outra plaquinha", "item esgotado").
+    // precisa ler ("informe o nome", "item esgotado").
     let mensagem = 'Não foi possível enviar o pedido. Tente novamente.'
     let codigo = null
     let itens = []

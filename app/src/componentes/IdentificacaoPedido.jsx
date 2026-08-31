@@ -1,29 +1,26 @@
 // ============================================================
-// NUMERO DA MESA — ultima etapa do pedido
+// IDENTIFICACAO DO PEDIDO — ultima etapa, no lugar da mesa
 //
-// O cliente digita o numero da plaquinha que pegou ao lado do
-// totem. E a identificacao do pedido: o garcom procura essa
-// plaquinha na mesa, e o caixa cobra por ela.
+// Sem mesa, sem plaquinha: o cliente digita o proprio nome e
+// escolhe comer no local ou levar. E isso que identifica o pedido
+// na cozinha (no cupom impresso) e no caixa.
 //
-// Confirmacao explicita antes de enviar. Mesa errada significa
-// comida entregue na mesa errada — vale um toque a mais.
+// Confirmacao explicita antes de enviar, mesma regra de sempre —
+// nome errado ou tipo trocado so se descobre tarde demais.
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
 import { enviarPedido } from '../lib/pedidos.js'
 import { emReais } from '../lib/formato.js'
 
-const MAX_DIGITOS = 3
+const MAX_CARACTERES_NOME = 60
 
 // Tempo da tela de "pedido enviado" ate voltar sozinha ao inicio.
-// Curto de proposito: em horario de pico, cada segundo aqui e fila
-// la fora. Nada se perde quando a tela limpa — o cliente esta com a
-// plaquinha na mao e o caixa cobra por ela.
-//
-// Quem quiser sair antes tem o botao; a contagem e so o limite.
+// Mesmo valor de sempre (nao mexe: e o timer separado do de
+// inatividade geral, decidido assim em 29/08/2026).
 const SEGUNDOS_ATE_VOLTAR = 5
 
-export default function NumeroMesa({
+export default function IdentificacaoPedido({
   slug,
   carrinho,
   corTexto,
@@ -33,16 +30,16 @@ export default function NumeroMesa({
   aoItemEsgotado,
   aoConcluir,
 }) {
-  const [digitado, setDigitado] = useState('')
-  const [etapa, setEtapa] = useState('digitando')
+  const [nome, setNome] = useState('')
+  const [tipoConsumo, setTipoConsumo] = useState(null)
+  const [etapa, setEtapa] = useState('preenchendo')
   const [erro, setErro] = useState(null)
   const [pedido, setPedido] = useState(null)
   const [restam, setRestam] = useState(SEGUNDOS_ATE_VOLTAR)
   const fecharEm = useRef(null)
 
   // Avisa o totem para PARAR o relogio de inatividade enquanto o
-  // pedido esta indo (ou acabou de ir). Limpar a tela no meio de um
-  // envio lento faria o cliente achar que falhou, com o pedido gravado.
+  // pedido esta indo (ou acabou de ir).
   useEffect(() => {
     aoOcupado?.(etapa === 'enviando' || etapa === 'enviado')
   }, [etapa, aoOcupado])
@@ -50,15 +47,7 @@ export default function NumeroMesa({
   const total = carrinho.reduce((soma, item) => soma + item.totalMostrado, 0)
   const borda = `${corTexto}22`
 
-  // Depois de enviado, volta sozinho para a tela inicial: o proximo
-  // cliente nao pode encontrar o pedido do anterior na tela.
-  //
-  // A contagem aparece na tela de proposito: quem esta esperando ve
-  // que o totem vai liberar, em vez de achar que travou.
-  // Guardamos a HORA de fechar, em vez de contar quantas vezes o
-  // cronometro disparou. Contando disparos, qualquer reinicio do
-  // cronometro (o React remonta a tela em desenvolvimento) empurra
-  // o fim para frente e a tela demora mais que o combinado.
+  // Depois de enviado, volta sozinho para a tela inicial.
   useEffect(() => {
     if (etapa !== 'enviado') return
 
@@ -85,35 +74,27 @@ export default function NumeroMesa({
     return () => clearInterval(relogio)
   }, [etapa, aoConcluir])
 
-  function digitar(numero) {
-    setDigitado((atual) => (atual.length >= MAX_DIGITOS ? atual : atual + numero))
-  }
-
   async function enviar() {
     setEtapa('enviando')
     setErro(null)
 
     const resultado = await enviarPedido({
       slug,
-      mesaNumero: Number(digitado),
+      nomeCliente: nome.trim(),
+      tipoConsumo,
       carrinho,
     })
 
     if (!resultado.ok) {
-      // Item esgotou no meio do pedido: nao adianta pedir outro numero
-      // de mesa, o problema esta no carrinho. Manda o cliente de volta
-      // para lá, com a linha marcada — descobrir isso no fim e o pior
-      // momento possivel, mas pelo menos ele ve o que resolver.
+      // Item esgotou no meio do pedido: manda o cliente de volta ao
+      // carrinho, o problema nao esta no nome nem no tipo de consumo.
       if (resultado.codigo === 'item_esgotado') {
         aoItemEsgotado?.(resultado.itens, resultado.mensagem)
         return
       }
 
-      // NUNCA limpar o carrinho aqui: o cliente vai querer tentar
-      // outro numero, nao refazer o pedido inteiro.
       setErro(resultado.mensagem)
-      setEtapa('digitando')
-      setDigitado('')
+      setEtapa('preenchendo')
       return
     }
 
@@ -133,17 +114,16 @@ export default function NumeroMesa({
         <p className="text-5xl font-bold">Pedido enviado!</p>
 
         <div className="rounded-3xl px-16 py-8" style={{ backgroundColor: corTexto, color: corFundo }}>
-          <p className="text-3xl font-bold opacity-80">Mesa</p>
-          <p className="text-[clamp(4rem,16vh,8rem)] font-black leading-none">
-            {pedido.mesa_numero}
+          <p className="text-3xl font-bold opacity-80">
+            {pedido.tipo_consumo === 'levar' ? 'Para levar' : 'Comer aqui'}
+          </p>
+          <p className="text-[clamp(2.5rem,10vh,6rem)] font-black leading-none">
+            {pedido.nome_cliente}
           </p>
         </div>
 
         <p className="text-4xl font-bold">Pague no caixa</p>
-        <p className="text-2xl opacity-70">Deixe a plaquinha na mesa.</p>
 
-        {/* preenchido, nao so contornado: quem ja leu sai na hora e
-            libera o totem, sem esperar a contagem terminar */}
         <button
           onClick={aoConcluir}
           className="mt-4 min-h-[76px] rounded-2xl px-16 py-4 text-3xl font-black active:scale-95"
@@ -171,7 +151,7 @@ export default function NumeroMesa({
   }
 
   // ----------------------------------------------------------
-  // CONFIRMACAO ("Mesa 17, esta certo?")
+  // CONFIRMACAO
   // ----------------------------------------------------------
   if (etapa === 'confirmando') {
     return (
@@ -179,9 +159,12 @@ export default function NumeroMesa({
         className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center"
         style={{ backgroundColor: corFundo, color: corTexto }}
       >
-        <p className="text-4xl font-bold">Confirme o número da mesa</p>
+        <p className="text-4xl font-bold">Confirme seu pedido</p>
 
-        <p className="text-[clamp(4rem,18vh,10rem)] font-black leading-none">{digitado}</p>
+        <p className="text-[clamp(2rem,8vh,4rem)] font-black leading-tight">{nome}</p>
+        <p className="text-2xl font-bold opacity-80">
+          {tipoConsumo === 'levar' ? 'Para levar' : 'Comer aqui'}
+        </p>
 
         <p className="text-3xl opacity-70">
           Total: <span className="font-black">{emReais(total)}</span>
@@ -189,7 +172,7 @@ export default function NumeroMesa({
 
         <div className="mt-4 flex gap-6">
           <button
-            onClick={() => setEtapa('digitando')}
+            onClick={() => setEtapa('preenchendo')}
             className="min-h-[88px] rounded-2xl border-4 px-12 text-3xl font-bold active:scale-95"
             style={{ borderColor: corTexto }}
           >
@@ -208,8 +191,10 @@ export default function NumeroMesa({
   }
 
   // ----------------------------------------------------------
-  // TECLADO
+  // PREENCHENDO — tipo de consumo + nome
   // ----------------------------------------------------------
+  const podeContinuar = tipoConsumo !== null && nome.trim() !== ''
+
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: corFundo, color: corTexto }}>
       <header
@@ -223,58 +208,75 @@ export default function NumeroMesa({
         >
           ← Voltar
         </button>
-        <h1 className="text-[clamp(1.5rem,4vh,1.875rem)] font-black">Número da mesa</h1>
+        <h1 className="text-[clamp(1.5rem,4vh,1.875rem)] font-black">Finalizar pedido</h1>
       </header>
 
-      {/* Rolagem de seguranca. Centralizar sem isso faz o conteudo
-          transbordar para os DOIS lados quando a tela e baixa: some
-          por cima do cabecalho e por baixo do botao, sem alcance. */}
+      {/* Rolagem de seguranca, mesmo motivo do teclado de mesa antigo:
+          centralizar sem isso transborda em tela baixa. */}
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
-        {/* Margens menores em tela estreita. Economizar aqui, em vez de
-            encolher as teclas, mantem o tablet — que e o alvo — com
-            alvo de toque grande. */}
-        <div className="flex min-h-full flex-col items-center justify-center gap-[1vh] p-3 sm:gap-[2vh] sm:p-6">
-          {erro ? (
+        <div className="flex min-h-full flex-col items-center justify-center gap-[2vh] p-3 sm:p-6">
+          {erro && (
             <p
-              className="max-w-3xl rounded-2xl px-8 py-5 text-center text-3xl font-bold"
+              className="max-w-3xl rounded-2xl px-8 py-5 text-center text-2xl font-bold"
               style={{ backgroundColor: corTexto, color: corFundo }}
             >
               {erro}
             </p>
-          ) : (
-            <p className="text-center text-[clamp(1.25rem,3.5vh,1.875rem)] font-bold opacity-70">
-              Digite o número da plaquinha que você pegou
-            </p>
           )}
 
-          <p className="text-[clamp(2.5rem,10vh,7rem)] font-black leading-none">
-            {digitado || <span className="opacity-25">—</span>}
+          <p className="text-center text-[clamp(1.25rem,3.5vh,1.875rem)] font-bold opacity-70">
+            Vai comer aqui ou levar?
           </p>
 
-          <div className="grid grid-cols-3 gap-2 sm:gap-[1.5vh]">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((numero) => (
-              <Tecla key={numero} corTexto={corTexto} aoTocar={() => digitar(String(numero))}>
-                {numero}
-              </Tecla>
-            ))}
-
-            <Tecla corTexto={corTexto} aoTocar={() => setDigitado('')}>
-              limpar
-            </Tecla>
-            <Tecla corTexto={corTexto} aoTocar={() => digitar('0')}>
-              0
-            </Tecla>
-            <Tecla corTexto={corTexto} aoTocar={() => setDigitado((a) => a.slice(0, -1))}>
-              ←
-            </Tecla>
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              onClick={() => setTipoConsumo('local')}
+              className="min-h-[88px] min-w-[220px] rounded-2xl border-4 px-8 text-2xl font-black active:scale-95"
+              style={
+                tipoConsumo === 'local'
+                  ? { backgroundColor: corTexto, color: corFundo, borderColor: corTexto }
+                  : { borderColor: corTexto }
+              }
+            >
+              Comer aqui
+            </button>
+            <button
+              onClick={() => setTipoConsumo('levar')}
+              className="min-h-[88px] min-w-[220px] rounded-2xl border-4 px-8 text-2xl font-black active:scale-95"
+              style={
+                tipoConsumo === 'levar'
+                  ? { backgroundColor: corTexto, color: corFundo, borderColor: corTexto }
+                  : { borderColor: corTexto }
+              }
+            >
+              Para levar
+            </button>
           </div>
+
+          <p className="mt-[2vh] text-center text-[clamp(1.25rem,3.5vh,1.875rem)] font-bold opacity-70">
+            Qual é o seu nome?
+          </p>
+
+          <input
+            type="text"
+            value={nome}
+            onChange={(e) => setNome(e.target.value.slice(0, MAX_CARACTERES_NOME))}
+            placeholder="Digite seu nome"
+            autoCapitalize="words"
+            className="w-full max-w-xl rounded-2xl border-4 bg-transparent px-6 py-4 text-center text-4xl font-black outline-none"
+            style={{ borderColor: corTexto, color: corTexto }}
+          />
+
+          <p className="text-3xl opacity-70">
+            Total: <span className="font-black">{emReais(total)}</span>
+          </p>
         </div>
       </div>
 
       <footer className="border-t-2 px-6 py-[1.5vh]" style={{ borderColor: borda }}>
         <button
           onClick={() => setEtapa('confirmando')}
-          disabled={digitado === '' || Number(digitado) === 0}
+          disabled={!podeContinuar}
           className="min-h-[clamp(60px,10vh,88px)] w-full rounded-2xl text-[clamp(1.5rem,4vh,1.875rem)] font-black disabled:opacity-40 active:enabled:scale-95"
           style={{ backgroundColor: corTexto, color: corFundo }}
         >
@@ -282,19 +284,5 @@ export default function NumeroMesa({
         </button>
       </footer>
     </div>
-  )
-}
-
-// Tamanho proporcional a tela, com PISO DE 60px: e o alvo minimo
-// de toque do projeto. Encolher alem disso vira erro de digitacao.
-function Tecla({ children, corTexto, aoTocar }) {
-  return (
-    <button
-      onClick={aoTocar}
-      className="h-[clamp(60px,9vh,92px)] w-[clamp(84px,11vw,132px)] rounded-2xl border-4 text-[clamp(1.25rem,4vh,2.25rem)] font-black active:scale-95"
-      style={{ borderColor: corTexto }}
-    >
-      {children}
-    </button>
   )
 }
