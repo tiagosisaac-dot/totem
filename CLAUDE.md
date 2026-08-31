@@ -115,8 +115,9 @@ Já rodadas: 002 (plaquinha), 003 (devolução), 004 (cardápio ao vivo),
 006 (heartbeat), 007 (coluna `depende_da_opcao_id`, grupo de opção condicional
 do combo — confirmada em 27/08/2026, junto com a republicação da Edge Function
 `criar-pedido` e o `combo_transformar_burger.sql`).
-**008 (nome do cliente + tipo de consumo + impressão, tira mesa/plaquinha do
-fluxo) — escrita em 29/08/2026, AINDA NÃO RODADA pelo Isaac.**
+008 (nome do cliente + tipo de consumo + impressão, tira mesa/plaquinha do
+fluxo — rodada em 31/08/2026, colunas conferidas: `nome_cliente`/`tipo_consumo`
+`not null`, `senha`/`impresso_em` nullable).
 
 **Cardápio de teste: APAGADO em 20/08/2026.** Os ids que começavam com
 `00000000-0000-4000-8000-` eram falsos (`supabase/seed\_teste\_dev.sql`) e saíram
@@ -354,11 +355,17 @@ antiga. Não voltar. Reavaliar quando sair release com o patch
 **Prioridade agora: colocar a impressão no ar.** Nesta ordem (ver seção
 "Impressão do pedido" acima):
 
-1. Isaac roda `migracao_008_senha_e_impressao.sql` no SQL Editor
-2. `git push` (Vercel publica: totem sem mesa, cozinha/balcão removidas, tela
-`/impressora` nova)
-3. Republicar a Edge Function `criar-pedido`
-4. Isaac instala o QZ Tray no computador da loja, configura a i9, roda
+1. ~~Isaac roda `migracao_008_senha_e_impressao.sql` no SQL Editor~~ — **feito**
+(31/08/2026)
+2. ~~`git push`~~ — **feito** (31/08/2026, commit `ebe8223`): totem sem mesa,
+cozinha/balcão removidas, tela `/impressora` nova, no ar na Vercel
+3. ~~Republicar a Edge Function `criar-pedido`~~ — **feito** (31/08/2026)
+4. **Isaac decidiu (31/08/2026): mantém QZ Tray**, mesmo com o totem podendo
+rodar num PC com tela touch em vez de tablet Android. Totem e `/impressora`
+não se falam direto — só pelo banco — então funciona tanto num PC só (totem +
+aba `/impressora` na mesma máquina) quanto em dois PCs separados (QZ Tray só
+precisa estar na máquina ligada por USB na i9). **Falta**: instalar o QZ Tray
+no computador da loja, configurar a i9, rodar
 `supabase/configura\_impressora\_adoravelburguer.sql` com o nome exato da
 impressora
 5. Abrir `/adoravelburguer/impressora` nesse computador, logar, aceitar o QZ
