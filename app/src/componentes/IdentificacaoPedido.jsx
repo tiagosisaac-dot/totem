@@ -224,6 +224,14 @@ export default function IdentificacaoPedido({
             pedido segue sozinho. Se precisar de ajuda, chame um atendente.
           </p>
         )}
+
+        <button
+          onClick={aoConcluir}
+          className="mt-2 min-h-[60px] rounded-2xl border-4 px-10 text-xl font-bold active:scale-95"
+          style={{ borderColor: corTexto }}
+        >
+          Desistir do pedido
+        </button>
       </div>
     )
   }
@@ -238,13 +246,22 @@ export default function IdentificacaoPedido({
         style={{ backgroundColor: corFundo, color: corTexto }}
       >
         <p className="text-4xl font-bold">{erroPix}</p>
-        <button
-          onClick={() => gerarPix(pedido)}
-          className="min-h-[76px] rounded-2xl px-16 py-4 text-3xl font-black active:scale-95"
-          style={{ backgroundColor: corTexto, color: corFundo }}
-        >
-          Tentar novamente
-        </button>
+        <div className="flex flex-wrap justify-center gap-6">
+          <button
+            onClick={aoConcluir}
+            className="min-h-[76px] rounded-2xl border-4 px-12 text-2xl font-bold active:scale-95"
+            style={{ borderColor: corTexto }}
+          >
+            Desistir do pedido
+          </button>
+          <button
+            onClick={() => gerarPix(pedido)}
+            className="min-h-[76px] rounded-2xl px-16 py-4 text-3xl font-black active:scale-95"
+            style={{ backgroundColor: corTexto, color: corFundo }}
+          >
+            Tentar novamente
+          </button>
+        </div>
       </div>
     )
   }
