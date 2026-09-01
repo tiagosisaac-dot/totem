@@ -509,7 +509,7 @@ Deno.serve(async (req) => {
         nome_cliente: nomeCliente,
         tipo_consumo: tipoConsumo,
         total: paraReais(totalCentavos), // calculado AQUI, nunca recebido
-        forma_pagamento: 'caixa',
+        forma_pagamento: 'pix', // totem so aceita Pix — nao existe mais "pagar no caixa"
         observacao: texto(corpo.observacao),
         origem: 'totem',
       })

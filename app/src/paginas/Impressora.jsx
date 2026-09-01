@@ -5,15 +5,17 @@
 // Bematech i9. O navegador sozinho nao alcança impressora USB — o
 // QZ Tray (instalado nesse computador) e a ponte.
 //
-// Pedido NAO imprime sozinho — precisa do clique manual em "Imprimir"
-// (botao vermelho), depois que o caixa confirma o pagamento. Sem
-// isso, pedido de quem desiste antes de pagar iria pra producao do
-// mesmo jeito. Depois de impresso, vira "Reimprimir" (verde) — papel
-// pode emperrar ou acabar, nunca falha silenciosa (mesmo principio
-// do heartbeat).
+// Pagamento (01/09/2026): totem so aceita Pix, sem caixa. Pedido
+// imprime SOZINHO assim que pago=true (confirmado pelo webhook do
+// Mercado Pago, nunca por clique) — antes de pago, nem o botao manual
+// funciona, pra nao reabrir o problema de mandar pra producao sem
+// confirmar o pagamento. Depois de pago, o botao manual continua
+// existindo como "Reimprimir" — papel pode emperrar ou o QZ Tray
+// pode estar desconectado no instante exato do auto-print, nunca
+// falha silenciosa (mesmo principio do heartbeat).
 // ============================================================
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import qz from 'qz-tray'
 import { supabase } from '../lib/supabase.js'
@@ -24,7 +26,7 @@ import { emReais } from '../lib/formato.js'
 import { ALERTA, Cabecalho, bloqueioDoPainel } from '../componentes/PainelComuns.jsx'
 
 const SELECT_PEDIDO =
-  'id, senha, nome_cliente, tipo_consumo, total, criado_em, impresso_em, ' +
+  'id, senha, nome_cliente, tipo_consumo, total, criado_em, impresso_em, pago, ' +
   'pedido_itens(id, nome_snap, quantidade, combo_pai_id, pedido_item_opcoes(nome_snap))'
 
 // A opcao "Transformar em combo" traz um texto longo (nome_snap tipo
@@ -97,6 +99,9 @@ export default function Impressora() {
   const [qzErro, setQzErro] = useState(null)
   const [pedidos, setPedidos] = useState([])
   const [erroImpressao, setErroImpressao] = useState(null)
+  // guarda quem ja disparou o auto-print NESTA aba, pra nao chamar
+  // duas vezes enquanto impresso_em ainda nao voltou do banco
+  const jaTentados = useRef(new Set())
 
   // ---- config desta loja: nome da impressora + certificado do QZ Tray ----
   // (estabelecimentos.config e jsonb — REGRA 1, nada fixo no codigo)
@@ -244,6 +249,19 @@ export default function Impressora() {
     [qzConectado, config],
   )
 
+  // ---- pedido pago imprime sozinho, uma tentativa automatica por
+  // pedido — so dispara quando o QZ Tray ja esta pronto de verdade,
+  // senao um pedido que confirma o pagamento antes da conexao
+  // terminar fica descartado pra sempre sem tentar de novo sozinho ----
+  useEffect(() => {
+    if (!qzConectado || !config?.impressoraNome) return
+    for (const pedido of pedidos) {
+      if (!pedido.pago || pedido.impresso_em || jaTentados.current.has(pedido.id)) continue
+      jaTentados.current.add(pedido.id)
+      imprimir(pedido)
+    }
+  }, [pedidos, imprimir, qzConectado, config])
+
   const bloqueio = bloqueioDoPainel(painel, 'Impressora')
   if (bloqueio) return bloqueio
 
@@ -300,16 +318,25 @@ export default function Impressora() {
 
                 <div className="flex flex-wrap items-center gap-4">
                   <span className="text-lg font-bold opacity-60">
-                    {pedido.impresso_em ? 'Já foi pra cozinha' : 'Aguardando pagamento no caixa'}
+                    {pedido.impresso_em
+                      ? 'Já foi pra cozinha'
+                      : pedido.pago
+                        ? 'Pago — imprimindo...'
+                        : 'Aguardando pagamento via Pix...'}
                   </span>
 
-                  <button
-                    onClick={() => imprimir(pedido)}
-                    className="min-h-[60px] rounded-xl px-5 text-xl font-bold text-white active:scale-95"
-                    style={{ backgroundColor: pedido.impresso_em ? '#16A34A' : ALERTA }}
-                  >
-                    {pedido.impresso_em ? 'Reimprimir' : 'Imprimir'}
-                  </button>
+                  {/* Pedido nao pago nao pode ser impresso, nem manualmente —
+                      reabrir essa porta reintroduziria mandar pra producao
+                      antes de confirmar o dinheiro. */}
+                  {pedido.pago && (
+                    <button
+                      onClick={() => imprimir(pedido)}
+                      className="min-h-[60px] rounded-xl px-5 text-xl font-bold text-white active:scale-95"
+                      style={{ backgroundColor: pedido.impresso_em ? '#16A34A' : ALERTA }}
+                    >
+                      {pedido.impresso_em ? 'Reimprimir' : 'Imprimir'}
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

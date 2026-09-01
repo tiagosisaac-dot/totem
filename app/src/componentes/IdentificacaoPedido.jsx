@@ -7,18 +7,30 @@
 //
 // Confirmacao explicita antes de enviar, mesma regra de sempre —
 // nome errado ou tipo trocado so se descobre tarde demais.
+//
+// Pagamento (01/09/2026): so Pix, sem opcao de caixa. Depois de
+// enviado o pedido, gera o QR code (criar-cobranca-pix) e fica
+// consultando (consultar-pagamento-pix) ate confirmar sozinho —
+// nunca por botao de "eu paguei". So ai a cozinha ve o pedido
+// (Impressora.jsx imprime automatico quando pago=true).
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
 import { enviarPedido } from '../lib/pedidos.js'
+import { criarCobrancaPix, consultarPagamentoPix } from '../lib/pagamentoPix.js'
 import { emReais } from '../lib/formato.js'
 
 const MAX_CARACTERES_NOME = 60
 
-// Tempo da tela de "pedido enviado" ate voltar sozinha ao inicio.
-// Mesmo valor de sempre (nao mexe: e o timer separado do de
+// Tempo da tela de "pagamento confirmado" ate voltar sozinha ao
+// inicio. Mesmo valor de sempre (nao mexe: e o timer separado do de
 // inatividade geral, decidido assim em 29/08/2026).
 const SEGUNDOS_ATE_VOLTAR = 5
+
+// Intervalo de consulta ao pagamento, e quanto tempo esperar antes de
+// avisar que esta demorando (nao trava a tela, so avisa).
+const INTERVALO_CONSULTA_MS = 3000
+const MINUTOS_ATE_AVISAR_DEMORA = 3
 
 export default function IdentificacaoPedido({
   slug,
@@ -34,22 +46,28 @@ export default function IdentificacaoPedido({
   const [tipoConsumo, setTipoConsumo] = useState(null)
   const [etapa, setEtapa] = useState('preenchendo')
   const [erro, setErro] = useState(null)
+  const [erroPix, setErroPix] = useState(null)
   const [pedido, setPedido] = useState(null)
+  const [qr, setQr] = useState(null)
+  const [demorando, setDemorando] = useState(false)
   const [restam, setRestam] = useState(SEGUNDOS_ATE_VOLTAR)
   const fecharEm = useRef(null)
 
-  // Avisa o totem para PARAR o relogio de inatividade enquanto o
-  // pedido esta indo (ou acabou de ir).
+  // Etapas ocupadas: o cliente esta no meio de um pagamento, o
+  // relogio de inatividade geral nao pode interromper. 'erro_pix' fica
+  // de fora de proposito — se ninguem chamar o atendente, a
+  // inatividade normal acaba liberando o totem sozinha.
   useEffect(() => {
-    aoOcupado?.(etapa === 'enviando' || etapa === 'enviado')
+    const ocupado = ['enviando', 'gerando_pix', 'aguardando_pix', 'pago'].includes(etapa)
+    aoOcupado?.(ocupado)
   }, [etapa, aoOcupado])
 
   const total = carrinho.reduce((soma, item) => soma + item.totalMostrado, 0)
   const borda = `${corTexto}22`
 
-  // Depois de enviado, volta sozinho para a tela inicial.
+  // Depois de pago, volta sozinho para a tela inicial.
   useEffect(() => {
-    if (etapa !== 'enviado') return
+    if (etapa !== 'pago') return
 
     if (fecharEm.current === null) {
       fecharEm.current = Date.now() + SEGUNDOS_ATE_VOLTAR * 1000
@@ -73,6 +91,24 @@ export default function IdentificacaoPedido({
 
     return () => clearInterval(relogio)
   }, [etapa, aoConcluir])
+
+  // Gera o QR code Pix pro pedido ja criado. Separado de enviar() pra
+  // poder tentar de novo sem reenviar o pedido inteiro.
+  async function gerarPix(pedidoCriado) {
+    setEtapa('gerando_pix')
+    setErroPix(null)
+
+    const cobranca = await criarCobrancaPix({ slug, pedidoId: pedidoCriado.pedido_id })
+    if (!cobranca.ok) {
+      setErroPix(cobranca.mensagem)
+      setEtapa('erro_pix')
+      return
+    }
+
+    setQr(cobranca.dados)
+    setDemorando(false)
+    setEtapa('aguardando_pix')
+  }
 
   async function enviar() {
     setEtapa('enviando')
@@ -99,19 +135,44 @@ export default function IdentificacaoPedido({
     }
 
     setPedido(resultado.pedido)
-    setEtapa('enviado')
+    await gerarPix(resultado.pedido)
   }
 
+  // Consulta o pagamento em loop enquanto o QR esta na tela. Para de
+  // consultar assim que confirmar, ou se sair dessa etapa.
+  useEffect(() => {
+    if (etapa !== 'aguardando_pix' || !pedido) return
+    let cancelado = false
+    const inicio = Date.now()
+
+    async function verificar() {
+      const resultado = await consultarPagamentoPix({ slug, pedidoId: pedido.pedido_id })
+      if (cancelado) return
+      if (resultado.ok && resultado.dados.pago) {
+        setEtapa('pago')
+        return
+      }
+      setDemorando(Date.now() - inicio > MINUTOS_ATE_AVISAR_DEMORA * 60_000)
+    }
+
+    verificar()
+    const relogio = setInterval(verificar, INTERVALO_CONSULTA_MS)
+    return () => {
+      cancelado = true
+      clearInterval(relogio)
+    }
+  }, [etapa, pedido, slug])
+
   // ----------------------------------------------------------
-  // PEDIDO ENVIADO
+  // PAGAMENTO CONFIRMADO
   // ----------------------------------------------------------
-  if (etapa === 'enviado') {
+  if (etapa === 'pago') {
     return (
       <div
         className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center"
         style={{ backgroundColor: corFundo, color: corTexto }}
       >
-        <p className="text-5xl font-bold">Pedido enviado!</p>
+        <p className="text-5xl font-bold">Pagamento confirmado!</p>
 
         <div className="rounded-3xl px-16 py-8" style={{ backgroundColor: corTexto, color: corFundo }}>
           <p className="text-3xl font-bold opacity-80">
@@ -122,7 +183,7 @@ export default function IdentificacaoPedido({
           </p>
         </div>
 
-        <p className="text-4xl font-bold">Pague no caixa</p>
+        <p className="text-4xl font-bold">Seu pedido já foi pra cozinha</p>
 
         <button
           onClick={aoConcluir}
@@ -136,15 +197,70 @@ export default function IdentificacaoPedido({
   }
 
   // ----------------------------------------------------------
-  // ENVIANDO
+  // AGUARDANDO PAGAMENTO — QR code Pix
   // ----------------------------------------------------------
-  if (etapa === 'enviando') {
+  if (etapa === 'aguardando_pix') {
     return (
       <div
         className="flex h-full flex-col items-center justify-center gap-6 p-8 text-center"
         style={{ backgroundColor: corFundo, color: corTexto }}
       >
-        <p className="animate-pulse text-5xl font-bold">Enviando seu pedido...</p>
+        <p className="text-4xl font-bold">Escaneie para pagar com Pix</p>
+        <p className="text-3xl opacity-70">
+          Total: <span className="font-black">{emReais(total)}</span>
+        </p>
+
+        <img
+          src={`data:image/png;base64,${qr.qr_code_base64}`}
+          alt="QR code Pix"
+          className="h-64 w-64 rounded-2xl bg-white p-3"
+        />
+
+        <p className="animate-pulse text-2xl font-bold opacity-80">Aguardando pagamento...</p>
+
+        {demorando && (
+          <p className="max-w-xl rounded-2xl px-6 py-4 text-xl font-bold" style={{ backgroundColor: corTexto, color: corFundo }}>
+            Ainda não recebemos seu pagamento. Continue na tela — assim que confirmar, o
+            pedido segue sozinho. Se precisar de ajuda, chame um atendente.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  // ----------------------------------------------------------
+  // FALHA AO GERAR O PIX
+  // ----------------------------------------------------------
+  if (etapa === 'erro_pix') {
+    return (
+      <div
+        className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center"
+        style={{ backgroundColor: corFundo, color: corTexto }}
+      >
+        <p className="text-4xl font-bold">{erroPix}</p>
+        <button
+          onClick={() => gerarPix(pedido)}
+          className="min-h-[76px] rounded-2xl px-16 py-4 text-3xl font-black active:scale-95"
+          style={{ backgroundColor: corTexto, color: corFundo }}
+        >
+          Tentar novamente
+        </button>
+      </div>
+    )
+  }
+
+  // ----------------------------------------------------------
+  // ENVIANDO / GERANDO O PIX
+  // ----------------------------------------------------------
+  if (etapa === 'enviando' || etapa === 'gerando_pix') {
+    return (
+      <div
+        className="flex h-full flex-col items-center justify-center gap-6 p-8 text-center"
+        style={{ backgroundColor: corFundo, color: corTexto }}
+      >
+        <p className="animate-pulse text-5xl font-bold">
+          {etapa === 'enviando' ? 'Enviando seu pedido...' : 'Gerando o Pix...'}
+        </p>
         <p className="text-2xl opacity-70">Não saia desta tela.</p>
       </div>
     )
