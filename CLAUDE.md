@@ -198,7 +198,7 @@ Mecanismo diferente de adicional, não confunda
 `pedidos.impresso\_em` marca quando o cupom saiu na cozinha (nulo = falta
 imprimir). `pedidos.pago` (bool), `.forma\_pagamento` (`'pix'` fixo, hoje —
 sem caixa) e `.pago\_em` controlam o pagamento por Pix (desde 01/09/2026,
-ver "Pagamento por Pix" acima); `.pix\_pagamento\_id` liga o pedido ao
+ver "Pagamento por Pix" acima); `.pagamento\_externo\_id` liga o pedido ao
 pagamento no Mercado Pago, usado pelo webhook. `pedidos.mesa\_numero` e
 `pedidos.alerta\_reuso\_em` **SEM USO** desde 29/08/2026 (eram do modelo de
 plaquinha)
@@ -335,7 +335,7 @@ painel de Developers do Mercado Pago; o totem só usa o token de cada um.
 credenciais de cada loja. Nunca versionadas: SQL avulso gerado na hora, Isaac
 roda, arquivo apagado depois (mesmo padrão do certificado do QZ Tray).
 * Migração `supabase/migracao_009_pagamento_pix.sql` — **já rodada** em
-01/09/2026 — adiciona `pedidos.pago_em` e `pedidos.pix_pagamento_id`.
+01/09/2026 — adiciona `pedidos.pago_em` e `pedidos.pagamento_externo_id`.
 `pedidos.pago`, `.forma_pagamento` e `.status` já existiam no schema original,
 sem uso até agora.
 * Três Edge Functions novas: `criar-cobranca-pix` (gera o QR, chamada pelo

@@ -10,23 +10,28 @@
 -- pedidos.pago, pedidos.forma_pagamento e pedidos.status ja existiam no
 -- schema original (schema_totem_v1.sql), sem uso ate agora. So faltam as
 -- duas colunas abaixo.
+--
+-- NOTA: o nome real da coluna e pagamento_externo_id (nao pix_pagamento_id
+-- — uma versao anterior deste arquivo, ja rodada, usou esse nome; o codigo
+-- foi ajustado pra usar o nome que ja esta no banco, em vez de renomear a
+-- coluna de novo).
 -- ============================================================
 
 -- ----------------------------------------------------------
--- 1. Colunas novas em pedidos
+-- 1. Colunas novas em pedidos (idempotente — seguro rodar de novo)
 -- ----------------------------------------------------------
 alter table pedidos add column if not exists pago_em timestamptz;
-alter table pedidos add column if not exists pix_pagamento_id text;
+alter table pedidos add column if not exists pagamento_externo_id text;
 
 comment on column pedidos.pago_em is 'Instante da confirmacao de pagamento (webhook do Mercado Pago).';
-comment on column pedidos.pix_pagamento_id is 'Id do pagamento no Mercado Pago — liga o webhook ao pedido, evita processar a mesma confirmacao duas vezes.';
+comment on column pedidos.pagamento_externo_id is 'Id do pagamento no Mercado Pago — liga o webhook ao pedido, evita processar a mesma confirmacao duas vezes.';
 
-create index if not exists idx_pedidos_pix_pagamento_id
-  on pedidos (pix_pagamento_id) where pix_pagamento_id is not null;
+create index if not exists idx_pedidos_pagamento_externo_id
+  on pedidos (pagamento_externo_id) where pagamento_externo_id is not null;
 
 -- ----------------------------------------------------------
 -- CONFERE
 -- ----------------------------------------------------------
 select column_name, is_nullable, data_type
 from information_schema.columns
-where table_name = 'pedidos' and column_name in ('pago_em', 'pix_pagamento_id');
+where table_name = 'pedidos' and column_name in ('pago_em', 'pagamento_externo_id');

@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
 
     const { error: erroUpdate } = await sb
       .from('pedidos')
-      .update({ pix_pagamento_id: String(pagamento.id) })
+      .update({ pagamento_externo_id: String(pagamento.id) })
       .eq('id', pedido.id)
     if (erroUpdate) throw erroUpdate
 
@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
     }
     console.error('criar-cobranca-pix falhou:', e)
     // DEBUG TEMPORARIO (remover depois de achar a causa): expoe o erro real
-    return resposta({ erro: 'Não foi possível gerar o Pix. Tente novamente.', debug: String(e) }, 500)
+    const debug = e instanceof Error ? e.message : JSON.stringify(e)
+    return resposta({ erro: 'Não foi possível gerar o Pix. Tente novamente.', debug }, 500)
   }
 })
