@@ -196,8 +196,12 @@ Mecanismo diferente de adicional, não confunda
 `pedidos.nome\_cliente` (digitado no totem) e `pedidos.tipo\_consumo`
 (`local`/`levar`) são a identificação do pedido — sem mesa.
 `pedidos.impresso\_em` marca quando o cupom saiu na cozinha (nulo = falta
-imprimir). `pedidos.mesa\_numero` e `pedidos.alerta\_reuso\_em` **SEM USO**
-desde 29/08/2026 (eram do modelo de plaquinha)
+imprimir). `pedidos.pago` (bool), `.forma\_pagamento` (`'pix'` fixo, hoje —
+sem caixa) e `.pago\_em` controlam o pagamento por Pix (desde 01/09/2026,
+ver "Pagamento por Pix" acima); `.pix\_pagamento\_id` liga o pedido ao
+pagamento no Mercado Pago, usado pelo webhook. `pedidos.mesa\_numero` e
+`pedidos.alerta\_reuso\_em` **SEM USO** desde 29/08/2026 (eram do modelo de
+plaquinha)
 * `contadores\_senha` + `proxima\_senha(uuid)` — **voltou a ter uso em
 29/08/2026.** `pedidos.senha` é preenchido a cada pedido do totem, mas é só
 contagem interna do dia — não aparece grande em tela nem no cupom
@@ -311,28 +315,83 @@ sair.
 
 \---
 
+## Pagamento por Pix (Mercado Pago) — 01/09/2026, código no ar, ainda sem
+## conta real de nenhum cliente configurada
+
+Totem só aceita Pix (decisão do Isaac, ver "Fluxo do totem" acima). QR code
+dinâmico (valor exato, uso único), confirmação automática por webhook — nunca
+por botão de "eu paguei".
+
+**Por que cada estabelecimento tem a própria conta Mercado Pago, nunca uma
+conta do Isaac:** o dinheiro precisa cair direto na conta do cliente. Um
+sistema que centraliza o dinheiro numa conta e repassa pra cada loja é um
+"split de pagamento" — virou obrigatório por regulação do Banco Central pra
+marketplaces/fintechs em 2026, responsabilidade que este projeto não precisa
+assumir. Cada estabelecimento cria a própria conta e a própria Aplicação no
+painel de Developers do Mercado Pago; o totem só usa o token de cada um.
+
+* `estabelecimentos.config.mercado_pago_access_token` e
+`.mercado_pago_webhook_secret` (jsonb, sem migração nova — REGRA 1) guardam as
+credenciais de cada loja. Nunca versionadas: SQL avulso gerado na hora, Isaac
+roda, arquivo apagado depois (mesmo padrão do certificado do QZ Tray).
+* Migração `supabase/migracao_009_pagamento_pix.sql` — **já rodada** em
+01/09/2026 — adiciona `pedidos.pago_em` e `pedidos.pix_pagamento_id`.
+`pedidos.pago`, `.forma_pagamento` e `.status` já existiam no schema original,
+sem uso até agora.
+* Três Edge Functions novas: `criar-cobranca-pix` (gera o QR, chamada pelo
+totem depois de `criar-pedido`), `consultar-pagamento-pix` (o totem consulta
+em loop, só devolve `{pago: boolean}` — não abre RLS de `select` pra `anon`
+em `pedidos`, que vazaria pedido de todo mundo pra qualquer aparelho),
+`webhook-mercadopago` (recebe a notificação do Mercado Pago, publicada com
+`--no-verify-jwt` — é a única função do projeto que aceita chamada anônima de
+fora do sistema). `supabase/functions/_shared/mercadopago.ts` é o único lugar
+que fala REST com a API do Mercado Pago, mesmo padrão do `_shared/telegram.ts`.
+* O webhook **nunca confia no corpo da notificação pra saber se pagou**: valida
+a assinatura (`x-signature`, HMAC-SHA256) e sempre confere de volta na API do
+Mercado Pago (`GET /v1/payments/{id}`) antes de marcar `pago = true`. Também
+confere que o valor pago bate com `pedidos.total` (REGRA 2 por outro caminho).
+* **Pontos sinalizados no plano pra confirmar contra a documentação atual do
+Mercado Pago, ainda sem teste real:** se `payer.email` é obrigatório no
+`POST /v1/payments` (o totem não coleta e-mail — hoje manda um placeholder
+`pedido-<uuid>@totem.invalid`), formato exato da notificação de webhook, e se
+`notification_url` por requisição continua sendo respeitado.
+* **O que falta**: nenhum estabelecimento tem conta Mercado Pago configurada
+ainda. Pra testar (mesmo o Adorável Burguer): Isaac cria uma Aplicação de
+teste/sandbox no painel Developers, testamos com credenciais de teste (sem
+dinheiro real) antes de configurar a conta de produção. Só depois de
+confirmado, gera token + segredo de webhook reais e testa com um Pix pequeno
+de verdade.
+
+\---
+
 ## Fase 1 — escopo fechado
 
 Não construa nada fora desta lista. O piloto precisa ir ao ar.
 
 1. **Totem** (`/:slug`) — categorias → produto → personalização → carrinho
-→ comer aqui/para levar + nome do cliente → confirma
+→ comer aqui/para levar + nome do cliente → **Pix** → confirma
 2. **Edge Function `criar-pedido`** — valida, recalcula total ✅ *pronta*
-3. **Impressão** (`/:slug/impressora`) — pedido sai impresso na cozinha via QZ
-Tray, sem tela de cozinha nem plaquinha (ver seção "Impressão do pedido" acima)
-4. **Painel do dono** (`/:slug/admin`) — esgotar/reativar item, mudar preço
-5. **Pagamento: no caixa.** O cliente fala o nome no caixa
+3. **Pagamento por Pix** (Mercado Pago) — QR code dinâmico, confirmação
+automática via webhook, sem botão de "eu paguei" (ver "Pagamento por Pix"
+abaixo)
+4. **Impressão** (`/:slug/impressora`) — pedido sai impresso na cozinha via QZ
+Tray, sozinho assim que o Pix confirma (sem tela de cozinha nem plaquinha, ver
+seção "Impressão do pedido" acima)
+5. **Painel do dono** (`/:slug/admin`) — esgotar/reativar item, mudar preço
 
-**Fora de escopo agora:** Pix, maquininha, relatórios, NFC-e, cadastro de
-cardápio pelo dono (Isaac cadastra no onboarding).
+**Fora de escopo agora:** maquininha de cartão, relatórios, NFC-e, cadastro de
+cardápio pelo dono (Isaac cadastra no onboarding). **"Pagar no caixa" saiu do
+totem em 01/09/2026** — decisão do Isaac, o totem só aceita Pix agora (sem
+fallback pra caixa; risco assumido conscientemente: cliente sem Pix não
+consegue pedir pelo totem).
 
 \---
 
-## Fluxo do totem (29/08/2026: sem mesa, pedido impresso na cozinha)
+## Fluxo do totem (01/09/2026: sem mesa, pagamento por Pix, impressão automática)
 
 **Não há plaquinha nem número de mesa.** Na última tela, o cliente escolhe
 **comer no local ou levar** e digita o **próprio nome** — é isso que sai no
-cupom impresso na cozinha e que a equipe/caixa usa pra identificar o pedido.
+cupom impresso na cozinha e que a equipe usa pra identificar o pedido.
 O pedido ganha uma senha sequencial do dia só para contagem interna (não
 aparece grande em lugar nenhum).
 
@@ -341,8 +400,17 @@ aparece grande em lugar nenhum).
 3. Produto → grupos de opções (obrigatórios primeiro) → adicionar
 4. Carrinho → revisar
 5. **Comer aqui/para levar + nome**, teclado nativo do Android → **confirmar**
-6. "Pedido enviado. [Nome]. Pague no caixa."
-7. Volta sozinho para a tela inicial após 5s
+6. **QR code Pix** — "Escaneie para pagar", fica consultando sozinho até
+confirmar (nunca por clique de "eu paguei")
+7. "Pagamento confirmado! [Nome]. Seu pedido já foi pra cozinha."
+8. Volta sozinho para a tela inicial após 5s
+
+Se o cliente não pagar em alguns minutos, a tela avisa "ainda não recebemos
+seu pagamento" mas continua esperando (nunca some sozinha) — QR code continua
+válido, cliente pode terminar de pagar a qualquer momento enquanto estiver ali.
+Se a geração do Pix falhar (loja sem token configurado, Mercado Pago fora do
+ar), mostra erro com botão "Tentar novamente" — o pedido já foi criado no
+banco, não perde o lugar na fila só porque o Pix falhou momentaneamente.
 
 **Uma linha do carrinho = uma configuração com uma quantidade.** As opções
 escolhidas valem para a linha inteira: 3 hambúrgueres com blend extra são 3 com
@@ -371,9 +439,12 @@ tipo desktop.
 menor do que "mesa errada" era: nome trocado não manda comida pra estranho,
 só obriga a equipe a perguntar de novo no balcão
 * **Impressão falha** (papel emperrou/acabou) — nunca falha silenciosa: a tela
-`/impressora` mostra o pedido e tem botão "Imprimir"/"Reimprimir" (nunca some)
-* **Cliente desiste de pagar** — impressão é manual, só depois da confirmação
-no caixa (ver "Impressão do pedido" acima), pedido não vira comida sozinho
+`/impressora` mostra o pedido pago e tem botão "Imprimir"/"Reimprimir" (nunca
+some, mas só aparece depois de `pago = true`)
+* **Cliente desiste de pagar** — pedido não pago não pode ser impresso nem
+manualmente na tela `/impressora` (o botão nem aparece) — impressão só
+dispara sozinha quando o webhook do Mercado Pago confirma o pagamento (ver
+"Pagamento por Pix" abaixo)
 * **Totem caiu** — heartbeat, Isaac precisa saber antes do dono ligar
 
 \---
@@ -411,7 +482,29 @@ antiga. Não voltar. Reavaliar quando sair release com o patch
 
 ## Próximo passo
 
-**Prioridade agora: colocar a impressão no ar.** Nesta ordem (ver seção
+**Prioridade agora: Pix.** Sem Pix funcionando, nenhum pedido vira pago —
+e sem `pago = true`, nada imprime na cozinha (a impressão automática ficou
+presa ao pagamento em 01/09/2026). Nesta ordem (ver seção "Pagamento por
+Pix" acima):
+
+1. ~~Migração 009~~ — **feito** (01/09/2026)
+2. ~~Edge Functions `criar-cobranca-pix`, `consultar-pagamento-pix`,
+`webhook-mercadopago`, ajuste em `criar-pedido`, frontend do totem e da
+`/impressora`~~ — **feito e publicado** (01/09/2026)
+3. Isaac cria uma Aplicação de **teste/sandbox** no painel Developers do
+Mercado Pago (conta própria, nem que seja pessoal por enquanto) — testar o
+fluxo inteiro sem dinheiro real antes de mexer numa conta de cliente de
+verdade
+4. Testar ponta a ponta com credenciais de teste: pedido no totem → QR code
+→ pagar com Pix de teste → tela avança sozinha → `/impressora` mostra o
+pedido já impresso, sem clique manual
+5. Confirmado funcionando: Isaac ajuda o dono do Adorável Burguer a criar a
+própria conta Mercado Pago (a conta é do estabelecimento, nunca do Isaac —
+ver por quê na seção "Pagamento por Pix"), gerar Access Token + segredo de
+webhook de produção, mandar pro Claude preencher o SQL avulso
+6. Teste com Pix real, valor pequeno (ex. R$1,00)
+
+**Depois disso, colocar a impressão física no ar.** Nesta ordem (ver seção
 "Impressão do pedido" acima):
 
 1. ~~Isaac roda `migracao_008_senha_e_impressao.sql` no SQL Editor~~ — **feito**
