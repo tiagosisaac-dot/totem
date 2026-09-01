@@ -119,8 +119,6 @@ Deno.serve(async (req) => {
       return resposta({ erro: e.message }, e.status)
     }
     console.error('criar-cobranca-pix falhou:', e)
-    // DEBUG TEMPORARIO (remover depois de achar a causa): expoe o erro real
-    const debug = e instanceof Error ? e.message : JSON.stringify(e)
-    return resposta({ erro: 'Não foi possível gerar o Pix. Tente novamente.', debug }, 500)
+    return resposta({ erro: 'Não foi possível gerar o Pix. Tente novamente.' }, 500)
   }
 })
