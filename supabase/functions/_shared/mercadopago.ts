@@ -53,7 +53,10 @@ export async function criarPagamentoPix({
       external_reference: pedidoId,
       notification_url: notificationUrl,
       date_of_expiration: expira,
-      payer: { email: `pedido-${pedidoId}@totem.invalid` },
+      // Mercado Pago exige payer.email mesmo sem cliente cadastrado, e
+      // recusa dominios "reservados" tipo .invalid — confirmado testando
+      // direto na API (01/09/2026). example.com passa na validacao.
+      payer: { email: `pedido-${pedidoId}@example.com` },
     }),
   })
 
