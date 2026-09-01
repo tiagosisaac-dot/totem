@@ -22,6 +22,8 @@ async function chamar(nomeFuncao, corpo, mensagemPadrao) {
     try {
       const detalhe = await error.context?.json()
       if (detalhe?.erro) mensagem = detalhe.erro
+      // DEBUG TEMPORARIO (remover depois de achar a causa)
+      if (detalhe?.debug) mensagem += ` [${detalhe.debug}]`
     } catch {
       // resposta sem corpo legivel: fica a mensagem padrao
     }
