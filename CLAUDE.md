@@ -315,8 +315,9 @@ sair.
 
 \---
 
-## Pagamento por Pix (Mercado Pago) — 01/09/2026, código no ar, ainda sem
-## conta real de nenhum cliente configurada
+## Pagamento por Pix (Mercado Pago) — 01/09/2026, testado de ponta a ponta
+## com dinheiro real (conta pessoal do Isaac); falta trocar pela conta do
+## Adorável Burguer
 
 Totem só aceita Pix (decisão do Isaac, ver "Fluxo do totem" acima). QR code
 dinâmico (valor exato, uso único), confirmação automática por webhook — nunca
@@ -350,17 +351,30 @@ que fala REST com a API do Mercado Pago, mesmo padrão do `_shared/telegram.ts`.
 a assinatura (`x-signature`, HMAC-SHA256) e sempre confere de volta na API do
 Mercado Pago (`GET /v1/payments/{id}`) antes de marcar `pago = true`. Também
 confere que o valor pago bate com `pedidos.total` (REGRA 2 por outro caminho).
-* **Pontos sinalizados no plano pra confirmar contra a documentação atual do
-Mercado Pago, ainda sem teste real:** se `payer.email` é obrigatório no
-`POST /v1/payments` (o totem não coleta e-mail — hoje manda um placeholder
-`pedido-<uuid>@totem.invalid`), formato exato da notificação de webhook, e se
-`notification_url` por requisição continua sendo respeitado.
-* **O que falta**: nenhum estabelecimento tem conta Mercado Pago configurada
-ainda. Pra testar (mesmo o Adorável Burguer): Isaac cria uma Aplicação de
-teste/sandbox no painel Developers, testamos com credenciais de teste (sem
-dinheiro real) antes de configurar a conta de produção. Só depois de
-confirmado, gera token + segredo de webhook reais e testa com um Pix pequeno
-de verdade.
+* **Testado de ponta a ponta com dinheiro real em 01/09/2026** (R$ 1,00, item
+com preço temporariamente ajustado no painel do dono): totem → QR code →
+Pix pago pelo celular do Isaac → webhook confirma → tela do totem avança
+sozinha → pedido aparece pago em `/impressora`. Confirma que a arquitetura
+funciona ponta a ponta — só não imprimiu porque o QZ Tray não estava
+rodando no computador usado no teste (pendência separada, ver "Impressão do
+pedido").
+* **Detalhes confirmados nesse teste** (os pontos que o plano original deixou
+como "verificar depois"): `payer.email` É obrigatório no `POST /v1/payments`
+mesmo sem cliente cadastrado, mas recusa domínio `.invalid` — o código manda
+`pedido-<uuid>@example.com`, que passa. `notification_url` por requisição
+(mandado dentro do corpo de cada `POST /v1/payments`) É respeitado — o
+Mercado Pago manda a notificação pra lá, mesmo com uma URL diferente
+configurada no painel da Aplicação (a assinatura secreta, porém, é uma só
+por Aplicação, não muda entre "Modo de teste"/"Modo de produção").
+* **Bug corrigido nesse teste**: o nome real da coluna no banco é
+`pedidos.pagamento_externo_id` (não `pix_pagamento_id` — uma versão anterior
+do plano usou esse nome e chegou a ser rodada por engano; o código foi
+ajustado pra usar o nome real, sem precisar renomear a coluna de novo).
+* **Credenciais atuais no Adorável Burguer são as do Isaac (conta pessoal
+dele no Mercado Pago), não do dono do estabelecimento** — usadas só pra
+confirmar que o fluxo funciona com dinheiro real antes de envolver o
+cliente. **Ainda falta**: trocar pelas credenciais de produção da conta do
+próprio Adorável Burguer quando o piloto for pra loja de verdade.
 
 \---
 
@@ -482,30 +496,23 @@ antiga. Não voltar. Reavaliar quando sair release com o patch
 
 ## Próximo passo
 
-**Prioridade agora: Pix.** Sem Pix funcionando, nenhum pedido vira pago —
-e sem `pago = true`, nada imprime na cozinha (a impressão automática ficou
-presa ao pagamento em 01/09/2026). Nesta ordem (ver seção "Pagamento por
-Pix" acima):
+**Pix já funciona de ponta a ponta, testado com dinheiro real em
+01/09/2026** (ver "Pagamento por Pix" acima). Falta só:
 
 1. ~~Migração 009~~ — **feito** (01/09/2026)
-2. ~~Edge Functions `criar-cobranca-pix`, `consultar-pagamento-pix`,
-`webhook-mercadopago`, ajuste em `criar-pedido`, frontend do totem e da
+2. ~~Edge Functions, ajuste em `criar-pedido`, frontend do totem e da
 `/impressora`~~ — **feito e publicado** (01/09/2026)
-3. Isaac cria uma Aplicação de **teste/sandbox** no painel Developers do
-Mercado Pago (conta própria, nem que seja pessoal por enquanto) — testar o
-fluxo inteiro sem dinheiro real antes de mexer numa conta de cliente de
-verdade
-4. Testar ponta a ponta com credenciais de teste: pedido no totem → QR code
-→ pagar com Pix de teste → tela avança sozinha → `/impressora` mostra o
-pedido já impresso, sem clique manual
-5. Confirmado funcionando: Isaac ajuda o dono do Adorável Burguer a criar a
-própria conta Mercado Pago (a conta é do estabelecimento, nunca do Isaac —
-ver por quê na seção "Pagamento por Pix"), gerar Access Token + segredo de
-webhook de produção, mandar pro Claude preencher o SQL avulso
-6. Teste com Pix real, valor pequeno (ex. R$1,00)
+3. ~~Testar com credenciais de teste, depois com Pix real (R$1,00)~~ —
+**feito** (01/09/2026, usando a conta pessoal do Isaac no Mercado Pago —
+ver nota na seção "Pagamento por Pix")
+4. **Trocar as credenciais pela conta real do Adorável Burguer** quando o
+piloto for pra loja de verdade — mesmo passo de SQL avulso, só com token e
+segredo de webhook da conta do próprio estabelecimento
 
-**Depois disso, colocar a impressão física no ar.** Nesta ordem (ver seção
-"Impressão do pedido" acima):
+**Prioridade agora: colocar a impressão física no ar** (o Pix já empurra o
+pedido pra `/impressora` automaticamente assim que confirma — só falta a
+Bematech i9 física respondendo). Nesta ordem (ver seção "Impressão do
+pedido" acima):
 
 1. ~~Isaac roda `migracao_008_senha_e_impressao.sql` no SQL Editor~~ — **feito**
 (31/08/2026)
