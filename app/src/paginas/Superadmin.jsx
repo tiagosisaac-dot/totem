@@ -28,6 +28,7 @@ export default function Superadmin() {
   const [verificandoPapel, setVerificandoPapel] = useState(true)
   const [lojas, setLojas] = useState([])
   const [carregandoLojas, setCarregandoLojas] = useState(true)
+  const [estatisticas, setEstatisticas] = useState({})
   const [erro, setErro] = useState(null)
 
   useEffect(() => {
@@ -74,6 +75,41 @@ export default function Superadmin() {
           setLojas(data)
         }
         setCarregandoLojas(false)
+      })
+
+    return () => {
+      cancelado = true
+    }
+  }, [liberado])
+
+  // ---- pedidos dos ultimos 7 dias, por loja — pra medir o piloto ----
+  // (criterio de sucesso do docs/PRD.md: volume estavel/crescendo,
+  // abandono = total menos pagos)
+  useEffect(() => {
+    if (!liberado) return
+    let cancelado = false
+
+    const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString()
+
+    supabase
+      .from('pedidos')
+      .select('estabelecimento_id, pago')
+      .eq('origem', 'totem')
+      .gte('criado_em', seteDiasAtras)
+      .then(({ data, error }) => {
+        if (cancelado) return
+        if (error) {
+          console.error('Falha ao carregar estatísticas:', error)
+          return
+        }
+        const porLoja = {}
+        for (const p of data) {
+          const atual = porLoja[p.estabelecimento_id] ?? { total: 0, pagos: 0 }
+          atual.total += 1
+          if (p.pago) atual.pagos += 1
+          porLoja[p.estabelecimento_id] = atual
+        }
+        setEstatisticas(porLoja)
       })
 
     return () => {
@@ -168,6 +204,20 @@ export default function Superadmin() {
                 <div className="min-w-0 flex-1">
                   <p className="text-2xl font-bold">{loja.nome}</p>
                   <p className="text-lg opacity-60">/{loja.slug}</p>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-2xl font-black">
+                    {(estatisticas[loja.id]?.total ?? 0)}
+                  </p>
+                  <p className="text-sm opacity-60">pedidos (7 dias)</p>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-2xl font-black">
+                    {(estatisticas[loja.id]?.pagos ?? 0)}
+                  </p>
+                  <p className="text-sm opacity-60">pagos (7 dias)</p>
                 </div>
 
                 <span

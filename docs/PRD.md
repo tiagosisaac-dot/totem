@@ -121,7 +121,7 @@ Escopo fechado. O piloto precisa ir ao ar; nada fora desta lista entra agora.
   local ou levar, digita o nome, paga no caixa. **Sem mesa nem plaquinha** — o
   pedido sai impresso na cozinha (mesma impressora do Anota Aí), identificado
   pelo nome; a equipe entrega chamando/procurando por nome
-* **Quantos tablets:** **A DEFINIR**
+* **Quantos tablets (decidido em 10/09/2026):** um só, a princípio
 * **Data de início:** **A DEFINIR**
 * **Duração antes de decidir se vira produto:** **A DEFINIR**
 
