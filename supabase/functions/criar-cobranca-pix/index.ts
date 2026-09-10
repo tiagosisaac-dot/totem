@@ -16,7 +16,7 @@
 // ============================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { criarPagamentoPix } from '../_shared/mercadopago.ts'
+import { criarPagamentoPix, garantirTokenValido } from '../_shared/mercadopago.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
     if (erroEstab) throw erroEstab
     if (!estab) throw new ErroCobranca('Estabelecimento não encontrado.', 404)
 
-    const accessToken = (estab.config as Record<string, unknown> | null)?.mercado_pago_access_token
-    if (typeof accessToken !== 'string' || !accessToken) {
+    const accessToken = await garantirTokenValido(sb, estab)
+    if (!accessToken) {
       throw new ErroCobranca('Pix indisponível no momento. Chame um atendente.', 503)
     }
 
@@ -88,9 +88,10 @@ Deno.serve(async (req) => {
     if (!pedido) throw new ErroCobranca('Pedido não encontrado.', 404)
     if (pedido.pago) throw new ErroCobranca('Pedido já está pago.', 409)
 
-    const notificationUrl =
-      `${Deno.env.get('SUPABASE_URL')}/functions/v1/webhook-mercadopago` +
-      `?estabelecimento_id=${estab.id}`
+    // Sem ?estabelecimento_id= — desde 10/09/2026 o webhook acha o
+    // estabelecimento pelo user_id da notificacao (conta OAuth conectada
+    // com "Conectar Mercado Pago"), nao pela query string.
+    const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/webhook-mercadopago`
 
     const pagamento = await criarPagamentoPix({
       accessToken,

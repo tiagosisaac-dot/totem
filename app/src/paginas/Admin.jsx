@@ -13,7 +13,7 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useLojaLogada } from '../lib/useLojaLogada.js'
 import { sair } from '../lib/sessao.js'
@@ -25,12 +25,31 @@ const PAPEIS_PERMITIDOS = ['dono', 'superadmin']
 
 export default function Admin() {
   const { slug } = useParams()
+  const [params] = useSearchParams()
   const { sessao, carregandoSessao, loja, papel, acesso, corTexto, corFundo } = useLojaLogada(slug)
 
   const [categorias, setCategorias] = useState([])
   const [produtos, setProdutos] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
+  const [conectandoMp, setConectandoMp] = useState(false)
+
+  const statusMp = params.get('mp') // 'conectado' | 'erro' | null, vem do redirect do OAuth
+
+  async function conectarMercadoPago() {
+    setConectandoMp(true)
+    setErro(null)
+    const { data, error } = await supabase.functions.invoke('conectar-mercadopago', {
+      body: { estabelecimento_id: loja.id },
+    })
+    setConectandoMp(false)
+    if (error || !data?.url) {
+      console.error('Falha ao iniciar conexão com o Mercado Pago:', error)
+      setErro('Não foi possível iniciar a conexão com o Mercado Pago. Tente novamente.')
+      return
+    }
+    window.location.href = data.url
+  }
 
   const liberado = acesso === 'liberado' && PAPEIS_PERMITIDOS.includes(papel)
 
@@ -144,6 +163,17 @@ export default function Admin() {
         )}
       </Cabecalho>
 
+      {statusMp === 'conectado' && (
+        <p className="px-6 py-4 text-xl font-bold text-white" style={{ backgroundColor: '#2E7D32' }}>
+          Mercado Pago conectado com sucesso.
+        </p>
+      )}
+      {statusMp === 'erro' && (
+        <p className="px-6 py-4 text-xl font-bold text-white" style={{ backgroundColor: ALERTA }}>
+          Não foi possível conectar ao Mercado Pago. Tente novamente.
+        </p>
+      )}
+
       {erro && (
         <p
           className="px-6 py-4 text-xl font-bold text-white"
@@ -153,6 +183,18 @@ export default function Admin() {
           {erro}
         </p>
       )}
+
+      <section className="flex flex-wrap items-center gap-4 border-b-2 px-6 py-4" style={{ borderColor: `${corTexto}22` }}>
+        <p className="text-xl font-bold opacity-70">Pagamento por Pix (Mercado Pago)</p>
+        <button
+          onClick={conectarMercadoPago}
+          disabled={conectandoMp}
+          className="min-h-[60px] rounded-xl border-4 px-6 text-xl font-bold disabled:opacity-40 active:enabled:scale-95"
+          style={{ borderColor: corTexto }}
+        >
+          {conectandoMp ? 'Abrindo...' : 'Conectar Mercado Pago'}
+        </button>
+      </section>
 
       <main className="min-h-0 flex-1 overflow-y-auto p-5" style={{ overscrollBehavior: 'contain' }}>
         {carregando ? (

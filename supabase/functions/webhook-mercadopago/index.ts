@@ -6,9 +6,19 @@
 // do sistema. Precisa ser publicada com verificacao de JWT desligada
 // (o Mercado Pago nao manda token do Supabase).
 //
-// A url de notificacao e montada em criar-cobranca-pix com
-// ?estabelecimento_id=<uuid> — e assim que esta funcao sabe de qual
-// loja e, sem token nenhum, qual token/segredo usar.
+// Desde 10/09/2026 (migracao pra OAuth): a loja e identificada pelo
+// user_id que vem no CORPO da notificacao, comparado com
+// estabelecimentos.config.mercado_pago_user_id (gravado por
+// callback-oauth-mercadopago quando o dono conecta a conta). A
+// assinatura e validada com o segredo UNICO da plataforma
+// (MERCADO_PAGO_WEBHOOK_SECRET — antes era um segredo por
+// estabelecimento, agora e so um, porque so existe uma aplicacao
+// Mercado Pago, a do Isaac).
+//
+// Fallback temporario: se a notificacao ainda vier com
+// ?estabelecimento_id= na URL (formato antigo, de uma cobranca gerada
+// antes desta mudanca), usa isso pra achar a loja. Remover esse
+// fallback quando nao houver mais estabelecimento no modelo antigo.
 //
 // Nunca confia no corpo da notificacao pra saber se pagou: so serve
 // pra "avisar que aconteceu algo", o status de verdade vem sempre de
@@ -64,10 +74,6 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   )
 
-  const url = new URL(req.url)
-  const estabelecimentoId = url.searchParams.get('estabelecimento_id')
-  if (!estabelecimentoId) return resposta({ ok: true }) // notificacao sem como identificar a loja: ignora
-
   let corpo: Record<string, unknown>
   try {
     corpo = await req.json()
@@ -80,18 +86,36 @@ Deno.serve(async (req) => {
   const dataId = (corpo.data as Record<string, unknown> | undefined)?.id
   if (typeof dataId !== 'string' && typeof dataId !== 'number') return resposta({ ok: true })
 
-  const { data: estab } = await sb
-    .from('estabelecimentos')
-    .select('id, config')
-    .eq('id', estabelecimentoId)
-    .maybeSingle()
-  if (!estab) return resposta({ ok: true })
+  // Acha a loja pelo user_id da notificacao (modelo OAuth). Fallback:
+  // ?estabelecimento_id= na URL, so pra cobranca gerada antes da
+  // migracao pra OAuth — remover quando nao sobrar mais nenhuma.
+  const userId = corpo.user_id
+  const estabelecimentoIdAntigo = new URL(req.url).searchParams.get('estabelecimento_id')
 
-  const config = estab.config as Record<string, unknown> | null
+  let estab: { id: string; config: Record<string, unknown> | null } | null = null
+  if (userId !== undefined && userId !== null) {
+    const { data } = await sb
+      .from('estabelecimentos')
+      .select('id, config')
+      .eq('config->>mercado_pago_user_id', String(userId))
+      .maybeSingle()
+    estab = data
+  }
+  if (!estab && estabelecimentoIdAntigo) {
+    const { data } = await sb
+      .from('estabelecimentos')
+      .select('id, config')
+      .eq('id', estabelecimentoIdAntigo)
+      .maybeSingle()
+    estab = data
+  }
+  if (!estab) return resposta({ ok: true }) // sem como identificar a loja: ignora
+
+  const config = estab.config
   const accessToken = config?.mercado_pago_access_token
-  const segredoWebhook = config?.mercado_pago_webhook_secret
-  if (typeof accessToken !== 'string' || typeof segredoWebhook !== 'string') {
-    console.error('webhook-mercadopago: estabelecimento sem credenciais configuradas', estabelecimentoId)
+  const segredoWebhook = Deno.env.get('MERCADO_PAGO_WEBHOOK_SECRET')
+  if (typeof accessToken !== 'string' || !segredoWebhook) {
+    console.error('webhook-mercadopago: estabelecimento sem credenciais configuradas', estab.id)
     return resposta({ ok: true })
   }
 
@@ -99,7 +123,7 @@ Deno.serve(async (req) => {
   const { ts, v1 } = lerAssinatura(req.headers.get('x-signature'))
   const requestId = req.headers.get('x-request-id') ?? ''
   if (!ts || !v1 || !(await assinaturaValida(segredoWebhook, String(dataId), requestId, ts, v1))) {
-    console.error('webhook-mercadopago: assinatura invalida', estabelecimentoId)
+    console.error('webhook-mercadopago: assinatura invalida', estab.id)
     return resposta({ ok: true }) // 200 sem processar: nunca da pista de por que falhou
   }
 
@@ -120,7 +144,7 @@ Deno.serve(async (req) => {
     .from('pedidos')
     .select('id, total')
     .eq('id', pagamento.external_reference)
-    .eq('estabelecimento_id', estabelecimentoId)
+    .eq('estabelecimento_id', estab.id)
     .maybeSingle()
 
   if (!pedido) return resposta({ ok: true })
