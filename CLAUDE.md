@@ -150,6 +150,15 @@ A `service\_role` só existe dentro da Edge Function — nunca no frontend.
 **Estabelecimento piloto:** Adorável Burguer, slug `adoravelburguer`,
 id `0d8ce944-a60e-469f-8dd5-622595fcab88`.
 
+**Estabelecimento de teste (isolamento):** `teste-isolamento`, id
+`b86e954a-0567-4877-bc69-48b8f23542c9` — mantido de propósito (10/09/2026)
+pra reverificar isolamento entre clientes no futuro (ex.: ao integrar
+C6/Inter). Não é cliente real, não aparece na Carteira Totem.
+
+**Carteira Totem** (controle de clientes, fora do repositório): artifact
+privado em `https://claude.ai/code/artifact/388c23f2-022a-4c87-8f0c-5a6cb8867aab`
+— status, mensalidade, contato e conexão de pagamento de cada estabelecimento.
+
 **Avisos de sistema (heartbeat):** bot do Telegram `@Totem\_alerta\_bot`, avisa o
 Isaac. O token e o chat id vivem como **segredos da Edge Function** (`supabase
 secrets set`), nunca no repositório. Trocar para WhatsApp um dia = reescrever só
@@ -509,6 +518,52 @@ daria "página não encontrada"
 roteamento no servidor. O totem é 100% navegador, esse código nem carrega. Não
 existe versão corrigida; a única "correção" oferecida é voltar para uma versão
 antiga. Não voltar. Reavaliar quando sair release com o patch
+
+\---
+
+## Onboarding de cliente novo — roteiro (10/09/2026)
+
+Não existe tela de autocadastro — todo estabelecimento novo é cadastrado à mão
+(Isaac roda SQL, cria login). O "código" já serve qualquer estabelecimento
+automaticamente (REGRA 1); o trabalho é só dado.
+
+1. **Cadastrar o estabelecimento**, SQL no SQL Editor:
+   ```sql
+   insert into estabelecimentos (slug, nome, fuso, ativo, aceita_pedidos)
+   values ('slug-da-loja', 'Nome da Loja', 'America/Sao_Paulo', true, true);
+   ```
+2. **Cadastrar o cardápio** (categorias, produtos, grupos de opções) — também
+   SQL avulso, mesmo padrão do `cardapio_adoravelburguer.sql`.
+3. **Criar os logins**: painel do Supabase → **Authentication → Users → Add
+   user** (não é SQL — criar direto em `auth.users` por SQL não é
+   recomendado, falta bookkeeping interno do Supabase Auth). Cria um pra
+   `dono` e um pra `cozinha`, com "Auto Confirm User" marcado.
+4. **Ligar os logins ao estabelecimento** (`perfis`), com os UID que o passo
+   3 gerou:
+   ```sql
+   insert into perfis (user_id, estabelecimento_id, papel, nome)
+   values ('uid-do-dono', 'id-do-estabelecimento', 'dono', 'Nome do Dono'),
+          ('uid-da-cozinha', 'id-do-estabelecimento', 'cozinha', 'Cozinha');
+   ```
+5. **Pix**: nada de SQL — o dono entra em `/<slug>/admin`, clica **"Conectar
+   Mercado Pago"**, loga na própria conta, autoriza. Pronto (ver "Pagamento
+   por Pix" acima — é o ganho da migração pra OAuth).
+6. **Impressão** (se for usar QZ Tray): gerar certificado próprio pro
+   estabelecimento (mesmo processo do Adorável, ver "Impressão do pedido"),
+   configurar `impressora_nome` depois que o QZ Tray identificar a
+   impressora física na loja.
+7. **Testar**: pedido de verdade no totem, Pix pequeno, confere que aparece
+   pago em `/impressora`.
+8. **Registrar na Carteira Totem** (painel de controle de clientes, artifact
+   privado) — status, mensalidade, contato do dono.
+
+**Pegadinha pra lembrar ao testar o passo 5 (ou qualquer login novo) logo
+depois de mexer com OUTRO estabelecimento no mesmo navegador:** se já tiver
+uma sessão logada (de outro teste, outro estabelecimento), a consulta que
+carrega os dados da loja no `/admin` pode voltar vazia e a tela fica presa
+em "Carregando..." — não é bug, é a RLS corretamente barrando um usuário
+logado de ver estabelecimento que não é o dele (REGRA 6). **Sempre testar
+login de estabelecimento novo numa aba anônima/privada**, ou deslogar antes.
 
 \---
 
