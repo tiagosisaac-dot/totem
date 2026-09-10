@@ -5,6 +5,8 @@
 //   /adoravelburguer            -> totem do salao
 //   /adoravelburguer/impressora -> imprime o pedido na cozinha (QZ Tray)
 //   /adoravelburguer/admin      -> painel do dono
+//   /superadmin                 -> painel central (so Isaac), sem slug —
+//                                  ve e controla TODOS os estabelecimentos
 //
 // O 'slug' na frente e o que identifica de qual estabelecimento a
 // tela esta falando. Nenhum nome de loja aparece aqui (REGRA 1).
@@ -14,11 +16,13 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Totem from './paginas/Totem.jsx'
 import Impressora from './paginas/Impressora.jsx'
 import Admin from './paginas/Admin.jsx'
+import Superadmin from './paginas/Superadmin.jsx'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/superadmin" element={<Superadmin />} />
         <Route path="/:slug" element={<Totem />} />
         <Route path="/:slug/impressora" element={<Impressora />} />
         <Route path="/:slug/admin" element={<Admin />} />
