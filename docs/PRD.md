@@ -80,8 +80,11 @@ o cliente não paga desenvolvimento — paga assinatura.
   cadastro na Fase 1 — é serviço, e serve para garantir que o cardápio entre certo
 * **Custo de infraestrutura:** **A DEFINIR** — precisa medir com o piloto rodando
   para saber a partir de quantos clientes a mensalidade se paga
-* **Equipamento:** **A DEFINIR** — o tablet é do dono, alugado, ou incluído?
-  Isso muda o preço e a barreira de entrada
+* **Equipamento (decidido em 10/09/2026):** o tablet/computador é do
+  **próprio estabelecimento** — Isaac não compra, não aluga nem envia
+  equipamento. Motivo: não travar o negócio em logística de hardware
+  (frete, estoque, manutenção física) justamente quando a ideia é poder
+  atender clientes em outros estados, não só presencial
 
 ---
 
@@ -262,7 +265,8 @@ estabelecimentos. Não são dívida técnica — são escolhas conscientes com p
 ## 14. Perguntas abertas
 
 1. ~~Valor da mensalidade~~ — **decidido em 10/09/2026**, ver seção 5
-2. O tablet é do dono ou entra no pacote?
+2. ~~O tablet é do dono ou entra no pacote?~~ — **decidido em 10/09/2026**:
+   é do estabelecimento, ver seção 5
 3. Quantos tablets no piloto e onde ficam fisicamente
 4. Critério de sucesso do piloto
 5. Depois da Fase 1, o que tem mais valor: pagamento no totem, relatório para o
@@ -298,7 +302,8 @@ punhado de decisões de negócio. Marcar conforme for resolvendo.
 - [ ] Quantos tablets no piloto e onde ficam
 - [ ] Data de início e por quanto tempo roda antes de decidir se vira produto
 - [ ] Critério de sucesso definido (não avaliar por sensação no fim)
-- [ ] Quem paga o tablet — do dono, alugado, ou incluído na mensalidade
+- [x] ~~Quem paga o tablet~~ — **decidido em 10/09/2026**: é do próprio
+      estabelecimento, ver seção 5
 - [ ] Canal de suporte combinado — como o dono chama o Isaac no meio do
       movimento se o totem travar
 
