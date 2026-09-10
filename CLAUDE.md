@@ -557,13 +557,22 @@ automaticamente (REGRA 1); o trabalho é só dado.
 8. **Registrar na Carteira Totem** (painel de controle de clientes, artifact
    privado) — status, mensalidade, contato do dono.
 
-**Pegadinha pra lembrar ao testar o passo 5 (ou qualquer login novo) logo
-depois de mexer com OUTRO estabelecimento no mesmo navegador:** se já tiver
-uma sessão logada (de outro teste, outro estabelecimento), a consulta que
-carrega os dados da loja no `/admin` pode voltar vazia e a tela fica presa
-em "Carregando..." — não é bug, é a RLS corretamente barrando um usuário
-logado de ver estabelecimento que não é o dele (REGRA 6). **Sempre testar
-login de estabelecimento novo numa aba anônima/privada**, ou deslogar antes.
+**Pegadinha de sessão — já apareceu 3 vezes nesta sessão de trabalho, sempre
+o mesmo motivo.** Uma sessão logada "sobrando" numa aba muda o que a RLS
+deixa aquela aba ver, de dois jeitos diferentes:
+- **Falta acesso**: testar login de estabelecimento novo (ou o `/admin`)
+numa aba com sessão de OUTRO estabelecimento ainda ativa — a consulta volta
+vazia e a tela fica presa em "Carregando...". Não é bug, é a RLS barrando
+certo um usuário logado de ver estabelecimento que não é o dele (REGRA 6).
+- **Acesso de mais**: testar o **totem** (que devia ser 100% anônimo) numa
+aba onde sobrou sessão de `dono` ou `superadmin` — aí o totem enxerga a loja
+mesmo bloqueada/inativa, porque quem está pedindo os dados não é mais um
+cliente anônimo, é alguém com acesso ampliado. O totem parece "não respeitar
+o bloqueio" sem ser esse o caso — o problema é a sessão, não o código.
+
+**Regra geral: sempre testar cada papel (cliente anônimo, dono, cozinha,
+superadmin) numa aba SEM nenhuma sessão de outro papel** — aba anônima nova,
+ou deslogar explicitamente antes (tem botão "Sair" em toda tela interna).
 
 \---
 
