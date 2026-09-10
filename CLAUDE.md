@@ -315,9 +315,8 @@ sair.
 
 \---
 
-## Pagamento por Pix (Mercado Pago) — 01/09/2026, testado de ponta a ponta
-## com dinheiro real (conta pessoal do Isaac); falta trocar pela conta do
-## Adorável Burguer
+## Pagamento por Pix (Mercado Pago) — 10/09/2026, migrado pra OAuth, testado
+## de ponta a ponta com dinheiro real na conta do próprio Adorável Burguer
 
 Totem só aceita Pix (decisão do Isaac, ver "Fluxo do totem" acima). QR code
 dinâmico (valor exato, uso único), confirmação automática por webhook — nunca
@@ -328,53 +327,72 @@ conta do Isaac:** o dinheiro precisa cair direto na conta do cliente. Um
 sistema que centraliza o dinheiro numa conta e repassa pra cada loja é um
 "split de pagamento" — virou obrigatório por regulação do Banco Central pra
 marketplaces/fintechs em 2026, responsabilidade que este projeto não precisa
-assumir. Cada estabelecimento cria a própria conta e a própria Aplicação no
-painel de Developers do Mercado Pago; o totem só usa o token de cada um.
+assumir.
 
-* `estabelecimentos.config.mercado_pago_access_token` e
-`.mercado_pago_webhook_secret` (jsonb, sem migração nova — REGRA 1) guardam as
-credenciais de cada loja. Nunca versionadas: SQL avulso gerado na hora, Isaac
-roda, arquivo apagado depois (mesmo padrão do certificado do QZ Tray).
-* Migração `supabase/migracao_009_pagamento_pix.sql` — **já rodada** em
-01/09/2026 — adiciona `pedidos.pago_em` e `pedidos.pagamento_externo_id`.
-`pedidos.pago`, `.forma_pagamento` e `.status` já existiam no schema original,
-sem uso até agora.
-* Três Edge Functions novas: `criar-cobranca-pix` (gera o QR, chamada pelo
-totem depois de `criar-pedido`), `consultar-pagamento-pix` (o totem consulta
-em loop, só devolve `{pago: boolean}` — não abre RLS de `select` pra `anon`
-em `pedidos`, que vazaria pedido de todo mundo pra qualquer aparelho),
-`webhook-mercadopago` (recebe a notificação do Mercado Pago, publicada com
-`--no-verify-jwt` — é a única função do projeto que aceita chamada anônima de
-fora do sistema). `supabase/functions/_shared/mercadopago.ts` é o único lugar
-que fala REST com a API do Mercado Pago, mesmo padrão do `_shared/telegram.ts`.
+**Conexão por OAuth (10/09/2026), não mais token colado à mão.** Até
+09/09/2026, cada estabelecimento precisava criar a própria Aplicação no
+painel de Developers do Mercado Pago, achar o menu de Webhooks (escondido,
+nada óbvio) e mandar token+segredo pro Isaac inserir via SQL avulso —
+inviável pra vários clientes não-técnicos, como ficou claro configurando o
+piloto Adorável Burguer na prática. Agora: o dono clica **"Conectar Mercado
+Pago"** no `/:slug/admin`, loga na própria conta, autoriza, pronto. Só existe
+**uma Aplicação** (a do Isaac, representando a plataforma "Totem"); cada
+estabelecimento só autoriza essa aplicação a agir na própria conta — o
+dinheiro continua caindo 100% direto em cada um, sem nenhum split. OAuth e
+"split de pagamento" são recursos **separados** no Mercado Pago — usar OAuth
+só pra obter o token de cada vendedor não reintroduz o risco regulatório
+citado acima.
+
+* `estabelecimentos.config` (jsonb, sem migração — REGRA 1) guarda por
+estabelecimento: `mercado_pago_access_token`, `.mercado_pago_refresh_token`,
+`.mercado_pago_token_expira_em` e `.mercado_pago_user_id` (o id numérico da
+conta do vendedor no Mercado Pago — é assim que o webhook único da
+plataforma sabe de qual loja é cada notificação). Tudo preenchido
+automaticamente por `callback-oauth-mercadopago`, nunca mais colado via SQL.
+* **Segredos de PLATAFORMA** (não mais por estabelecimento), via `supabase
+secrets set`, mesmo padrão do `TELEGRAM_BOT_TOKEN`: `MERCADO_PAGO_CLIENT_ID`,
+`MERCADO_PAGO_CLIENT_SECRET` (da Aplicação do Isaac, conta pessoal dele,
+client_id `4516039933338291`) e `MERCADO_PAGO_WEBHOOK_SECRET` (assinatura
+única da Aplicação — antes era um segredo por estabelecimento, agora só
+existe uma Aplicação, então só um segredo). Também `SITE_URL` (pra onde
+redirecionar de volta depois do OAuth).
+* Cinco Edge Functions: `criar-cobranca-pix` (gera o QR, chamada pelo totem
+depois de `criar-pedido`; usa `garantirTokenValido` pra renovar o token se
+estiver perto de vencer — reativo, a cada cobrança, sem cron novo, porque
+pedido normal do dia a dia já renova bem antes dos ~180 dias de validade),
+`consultar-pagamento-pix` (o totem consulta em loop, só devolve
+`{pago: boolean}` — não abre RLS de `select` pra `anon` em `pedidos`, que
+vazaria pedido de todo mundo pra qualquer aparelho), `webhook-mercadopago`
+(recebe a notificação do Mercado Pago, publicada com `--no-verify-jwt` —
+acha a loja pelo `user_id` do corpo da notificação, não mais por query
+string), `conectar-mercadopago` (devolve a URL de autorização pro botão do
+`/admin` — **só depois de conferir, via JWT + `perfis`, que quem pediu é
+dono/superadmin DAQUELE estabelecimento**: sem essa checagem, qualquer um que
+soubesse um `estabelecimento_id` — público, aparece no cardápio — poderia
+montar a URL sozinho e sequestrar a conexão de pagamento de outra loja) e
+`callback-oauth-mercadopago` (recebe o redirect do Mercado Pago depois que o
+dono autoriza, troca o `code` por token, grava em `estabelecimentos.config`,
+redireciona de volta pro `/admin`; publicada com `--no-verify-jwt`, é o
+navegador chamando direto, sem sessão do Supabase).
+`supabase/functions/_shared/mercadopago.ts` é o único lugar que fala REST com
+a API do Mercado Pago, mesmo padrão do `_shared/telegram.ts`.
 * O webhook **nunca confia no corpo da notificação pra saber se pagou**: valida
 a assinatura (`x-signature`, HMAC-SHA256) e sempre confere de volta na API do
 Mercado Pago (`GET /v1/payments/{id}`) antes de marcar `pago = true`. Também
 confere que o valor pago bate com `pedidos.total` (REGRA 2 por outro caminho).
-* **Testado de ponta a ponta com dinheiro real em 01/09/2026** (R$ 1,00, item
-com preço temporariamente ajustado no painel do dono): totem → QR code →
-Pix pago pelo celular do Isaac → webhook confirma → tela do totem avança
-sozinha → pedido aparece pago em `/impressora`. Confirma que a arquitetura
-funciona ponta a ponta — só não imprimiu porque o QZ Tray não estava
-rodando no computador usado no teste (pendência separada, ver "Impressão do
-pedido").
-* **Detalhes confirmados nesse teste** (os pontos que o plano original deixou
-como "verificar depois"): `payer.email` É obrigatório no `POST /v1/payments`
+* **Testado de ponta a ponta com dinheiro real em 10/09/2026, já na conta do
+próprio dono do Adorável Burguer** (R$ 1,00, item com preço temporariamente
+ajustado no painel do dono): dono clicou "Conectar Mercado Pago" → autorizou
+com a própria conta → totem → QR code → Pix pago → webhook confirma pelo
+`user_id` → `/impressora` imprimiu sozinha. Substitui o teste anterior
+(01/09/2026), que ainda usava a conta pessoal do Isaac e token colado à mão.
+* **Detalhes confirmados nesses testes** (pontos que o plano deixou como
+"verificar depois"): `payer.email` É obrigatório no `POST /v1/payments`
 mesmo sem cliente cadastrado, mas recusa domínio `.invalid` — o código manda
 `pedido-<uuid>@example.com`, que passa. `notification_url` por requisição
-(mandado dentro do corpo de cada `POST /v1/payments`) É respeitado — o
-Mercado Pago manda a notificação pra lá, mesmo com uma URL diferente
-configurada no painel da Aplicação (a assinatura secreta, porém, é uma só
-por Aplicação, não muda entre "Modo de teste"/"Modo de produção").
-* **Bug corrigido nesse teste**: o nome real da coluna no banco é
-`pedidos.pagamento_externo_id` (não `pix_pagamento_id` — uma versão anterior
-do plano usou esse nome e chegou a ser rodada por engano; o código foi
-ajustado pra usar o nome real, sem precisar renomear a coluna de novo).
-* **Credenciais atuais no Adorável Burguer são as do Isaac (conta pessoal
-dele no Mercado Pago), não do dono do estabelecimento** — usadas só pra
-confirmar que o fluxo funciona com dinheiro real antes de envolver o
-cliente. **Ainda falta**: trocar pelas credenciais de produção da conta do
-próprio Adorável Burguer quando o piloto for pra loja de verdade.
+(mandado dentro do corpo de cada `POST /v1/payments`) É respeitado, mesmo com
+uma URL diferente configurada no painel da Aplicação. O nome real da coluna
+no banco é `pedidos.pagamento_externo_id` (não `pix_pagamento_id`).
 
 \---
 

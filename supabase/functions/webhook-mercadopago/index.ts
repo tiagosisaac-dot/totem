@@ -15,11 +15,6 @@
 // estabelecimento, agora e so um, porque so existe uma aplicacao
 // Mercado Pago, a do Isaac).
 //
-// Fallback temporario: se a notificacao ainda vier com
-// ?estabelecimento_id= na URL (formato antigo, de uma cobranca gerada
-// antes desta mudanca), usa isso pra achar a loja. Remover esse
-// fallback quando nao houver mais estabelecimento no modelo antigo.
-//
 // Nunca confia no corpo da notificacao pra saber se pagou: so serve
 // pra "avisar que aconteceu algo", o status de verdade vem sempre de
 // consultarPagamento (GET /v1/payments/{id} de volta na API).
@@ -86,29 +81,15 @@ Deno.serve(async (req) => {
   const dataId = (corpo.data as Record<string, unknown> | undefined)?.id
   if (typeof dataId !== 'string' && typeof dataId !== 'number') return resposta({ ok: true })
 
-  // Acha a loja pelo user_id da notificacao (modelo OAuth). Fallback:
-  // ?estabelecimento_id= na URL, so pra cobranca gerada antes da
-  // migracao pra OAuth — remover quando nao sobrar mais nenhuma.
+  // Acha a loja pelo user_id da notificacao (modelo OAuth).
   const userId = corpo.user_id
-  const estabelecimentoIdAntigo = new URL(req.url).searchParams.get('estabelecimento_id')
+  if (userId === undefined || userId === null) return resposta({ ok: true })
 
-  let estab: { id: string; config: Record<string, unknown> | null } | null = null
-  if (userId !== undefined && userId !== null) {
-    const { data } = await sb
-      .from('estabelecimentos')
-      .select('id, config')
-      .eq('config->>mercado_pago_user_id', String(userId))
-      .maybeSingle()
-    estab = data
-  }
-  if (!estab && estabelecimentoIdAntigo) {
-    const { data } = await sb
-      .from('estabelecimentos')
-      .select('id, config')
-      .eq('id', estabelecimentoIdAntigo)
-      .maybeSingle()
-    estab = data
-  }
+  const { data: estab } = await sb
+    .from('estabelecimentos')
+    .select('id, config')
+    .eq('config->>mercado_pago_user_id', String(userId))
+    .maybeSingle()
   if (!estab) return resposta({ ok: true }) // sem como identificar a loja: ignora
 
   const config = estab.config
