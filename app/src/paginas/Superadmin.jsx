@@ -15,23 +15,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { useSessao, sair } from '../lib/sessao.js'
+import { useEstatisticasPedidos } from '../lib/useEstatisticas.js'
 import Login from '../componentes/Login.jsx'
+import SeletorPeriodo, { dataDeHoje, dataDiasAtras, inicioDoDiaIso, fimDoDiaIso } from '../componentes/SeletorPeriodo.jsx'
 import { ALERTA, Recado } from '../componentes/PainelComuns.jsx'
 
 const COR_TEXTO = '#111111'
 const COR_FUNDO = '#F5F5F5'
 const MENSAGEM_PADRAO = 'Sistema temporariamente indisponível.'
-
-const PERIODOS = [
-  { chave: 'hoje', rotulo: 'Hoje', dias: 1 },
-  { chave: '7dias', rotulo: '7 dias', dias: 7 },
-  { chave: '30dias', rotulo: '30 dias', dias: 30 },
-]
-
-// Pedido criado ha mais que isso e ainda nao pago conta como
-// desistencia — o QR code do Pix expira em 15 min (ver criarPagamentoPix),
-// entao passado esse tempo nao e mais "ainda pagando", e abandono de verdade.
-const MINUTOS_ATE_CONTAR_DESISTENCIA = 20
 
 export default function Superadmin() {
   const { sessao, carregando: carregandoSessao } = useSessao()
@@ -39,8 +30,8 @@ export default function Superadmin() {
   const [verificandoPapel, setVerificandoPapel] = useState(true)
   const [lojas, setLojas] = useState([])
   const [carregandoLojas, setCarregandoLojas] = useState(true)
-  const [estatisticas, setEstatisticas] = useState({})
-  const [periodo, setPeriodo] = useState('7dias')
+  const [dataInicio, setDataInicio] = useState(() => dataDiasAtras(7))
+  const [dataFim, setDataFim] = useState(() => dataDeHoje())
   const [erro, setErro] = useState(null)
 
   useEffect(() => {
@@ -97,56 +88,10 @@ export default function Superadmin() {
   // ---- pedidos + quedas do periodo escolhido, por loja — pra medir o
   // piloto (criterio de sucesso do docs/PRD.md: volume estavel/crescendo,
   // desistencia, confiabilidade) ----
-  useEffect(() => {
-    if (!liberado) return
-    let cancelado = false
-
-    const dias = PERIODOS.find((p) => p.chave === periodo)?.dias ?? 7
-    const inicio = new Date(Date.now() - dias * 24 * 60 * 60_000).toISOString()
-    const limiteDesistencia = new Date(Date.now() - MINUTOS_ATE_CONTAR_DESISTENCIA * 60_000).toISOString()
-
-    Promise.all([
-      supabase
-        .from('pedidos')
-        .select('estabelecimento_id, pago, criado_em')
-        .eq('origem', 'totem')
-        .gte('criado_em', inicio),
-      supabase
-        .from('totem_eventos')
-        .select('estabelecimento_id')
-        .eq('tipo', 'queda')
-        .gte('criado_em', inicio),
-    ]).then(([respPedidos, respEventos]) => {
-      if (cancelado) return
-      if (respPedidos.error || respEventos.error) {
-        console.error('Falha ao carregar estatísticas:', respPedidos.error || respEventos.error)
-        return
-      }
-
-      const porLoja = {}
-      const dadoDaLoja = (id) =>
-        (porLoja[id] ??= { total: 0, pagos: 0, desistencias: 0, quedas: 0 })
-
-      for (const p of respPedidos.data) {
-        const linha = dadoDaLoja(p.estabelecimento_id)
-        linha.total += 1
-        if (p.pago) {
-          linha.pagos += 1
-        } else if (p.criado_em < limiteDesistencia) {
-          linha.desistencias += 1
-        }
-      }
-      for (const e of respEventos.data) {
-        dadoDaLoja(e.estabelecimento_id).quedas += 1
-      }
-
-      setEstatisticas(porLoja)
-    })
-
-    return () => {
-      cancelado = true
-    }
-  }, [liberado, periodo])
+  const { porLoja: estatisticas } = useEstatisticasPedidos({
+    inicio: liberado ? inicioDoDiaIso(dataInicio) : null,
+    fim: liberado ? fimDoDiaIso(dataFim) : null,
+  })
 
   async function alternarBloqueio(loja) {
     const vaiBloquear = !loja.bloqueado
@@ -219,21 +164,14 @@ export default function Superadmin() {
         </p>
       )}
 
-      <div className="flex gap-2 border-b-2 px-5 py-3" style={{ borderColor: `${COR_TEXTO}22` }}>
-        {PERIODOS.map((p) => (
-          <button
-            key={p.chave}
-            onClick={() => setPeriodo(p.chave)}
-            className="min-h-[44px] rounded-lg px-4 text-lg font-bold active:scale-95"
-            style={
-              periodo === p.chave
-                ? { backgroundColor: COR_TEXTO, color: COR_FUNDO }
-                : { border: `2px solid ${COR_TEXTO}44` }
-            }
-          >
-            {p.rotulo}
-          </button>
-        ))}
+      <div className="border-b-2 px-5 py-3" style={{ borderColor: `${COR_TEXTO}22` }}>
+        <SeletorPeriodo
+          dataInicio={dataInicio}
+          dataFim={dataFim}
+          aoMudarInicio={setDataInicio}
+          aoMudarFim={setDataFim}
+          corTexto={COR_TEXTO}
+        />
       </div>
 
       <main className="min-h-0 flex-1 overflow-y-auto p-5" style={{ overscrollBehavior: 'contain' }}>

@@ -18,7 +18,9 @@ import { supabase } from '../lib/supabase.js'
 import { useLojaLogada } from '../lib/useLojaLogada.js'
 import { sair } from '../lib/sessao.js'
 import { emReais } from '../lib/formato.js'
+import { useEstatisticasPedidos } from '../lib/useEstatisticas.js'
 import Login from '../componentes/Login.jsx'
+import SeletorPeriodo, { dataDeHoje, dataDiasAtras, inicioDoDiaIso, fimDoDiaIso } from '../componentes/SeletorPeriodo.jsx'
 import { ALERTA, Cabecalho, Recado } from '../componentes/PainelComuns.jsx'
 
 const PAPEIS_PERMITIDOS = ['dono', 'superadmin']
@@ -33,6 +35,8 @@ export default function Admin() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(null)
   const [conectandoMp, setConectandoMp] = useState(false)
+  const [dataInicio, setDataInicio] = useState(() => dataDiasAtras(7))
+  const [dataFim, setDataFim] = useState(() => dataDeHoje())
 
   const statusMp = params.get('mp') // 'conectado' | 'erro' | null, vem do redirect do OAuth
 
@@ -52,6 +56,15 @@ export default function Admin() {
   }
 
   const liberado = acesso === 'liberado' && PAPEIS_PERMITIDOS.includes(papel)
+
+  // pedidos, desistencias e quedas da propria loja no periodo escolhido —
+  // mesmo hook e mesmo seletor que o /superadmin usa pra todas as lojas
+  const { porLoja: estatisticas } = useEstatisticasPedidos({
+    inicio: liberado && loja ? inicioDoDiaIso(dataInicio) : null,
+    fim: liberado && loja ? fimDoDiaIso(dataFim) : null,
+    estabelecimentoId: loja?.id,
+  })
+  const stats = loja ? estatisticas[loja.id] : null
 
   useEffect(() => {
     if (!liberado || !loja) return
@@ -194,6 +207,39 @@ export default function Admin() {
         >
           {conectandoMp ? 'Abrindo...' : 'Conectar Mercado Pago'}
         </button>
+      </section>
+
+      <section className="border-b-2 px-6 py-4" style={{ borderColor: `${corTexto}22` }}>
+        <p className="mb-2 text-xl font-bold opacity-70">Movimento da loja</p>
+        <SeletorPeriodo
+          dataInicio={dataInicio}
+          dataFim={dataFim}
+          aoMudarInicio={setDataInicio}
+          aoMudarFim={setDataFim}
+          corTexto={corTexto}
+        />
+        <div className="flex flex-wrap gap-6 pt-3">
+          <div className="text-center">
+            <p className="text-2xl font-black">{stats?.total ?? 0}</p>
+            <p className="text-sm opacity-60">pedidos</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-black">{stats?.pagos ?? 0}</p>
+            <p className="text-sm opacity-60">pagos</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-black" style={{ color: stats?.desistencias ? ALERTA : undefined }}>
+              {stats?.desistencias ?? 0}
+            </p>
+            <p className="text-sm opacity-60">desistências</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-black" style={{ color: stats?.quedas ? ALERTA : undefined }}>
+              {stats?.quedas ?? 0}
+            </p>
+            <p className="text-sm opacity-60">quedas</p>
+          </div>
+        </div>
       </section>
 
       <main className="min-h-0 flex-1 overflow-y-auto p-5" style={{ overscrollBehavior: 'contain' }}>

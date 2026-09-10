@@ -93,7 +93,12 @@ Pronto e testado:
 comer aqui/para levar, confirmação, envio, limpeza por inatividade
 * **Edge Function `criar-pedido`** — publicada; recusa fraude de total e item
 esgotado
-* **Painel do dono** (`/:slug/admin`) — esgotar/reativar e mudar preço
+* **Painel do dono** (`/:slug/admin`) — esgotar/reativar e mudar preço, conectar
+Mercado Pago, e ver o movimento da própria loja (pedidos/pagos/desistências/
+quedas por período — ver "Painel central e estatísticas" abaixo)
+* **Painel central** (`/superadmin`, só Isaac) — vê e controla TODOS os
+estabelecimentos: bloquear/desbloquear por inadimplência, e o mesmo painel de
+estatísticas do `/admin`, mas de todas as lojas juntas (ver seção abaixo)
 
 **Em andamento (29/08/2026), ainda sem teste na loja:**
 
@@ -214,6 +219,13 @@ plaquinha)
 * `contadores\_senha` + `proxima\_senha(uuid)` — **voltou a ter uso em
 29/08/2026.** `pedidos.senha` é preenchido a cada pedido do totem, mas é só
 contagem interna do dia — não aparece grande em tela nem no cupom
+
+* `totem_eventos` — histórico de queda/recuperação do totem (migração 012,
+10/09/2026). Uma linha por evento (`tipo` `'queda'`/`'recuperacao'`), gravada
+por `verificar-heartbeat` e `ping` no mesmo momento em que mandam o aviso pro
+Telegram. Existe só pra alimentar a contagem de "quedas" no `/admin` e no
+`/superadmin` — antes disso não havia como saber quantas vezes o totem tinha
+caído no passado, só o estado atual
 
 **Funções auxiliares de RLS:** `meu\_estabelecimento()`, `sou\_superadmin()`
 
@@ -402,6 +414,46 @@ mesmo sem cliente cadastrado, mas recusa domínio `.invalid` — o código manda
 (mandado dentro do corpo de cada `POST /v1/payments`) É respeitado, mesmo com
 uma URL diferente configurada no painel da Aplicação. O nome real da coluna
 no banco é `pedidos.pagamento_externo_id` (não `pix_pagamento_id`).
+
+\---
+
+## Painel central e estatísticas (`/superadmin` e `/:slug/admin`) — 10/09/2026
+
+Migração 011 (superadmin pode dar UPDATE em `estabelecimentos`) e migração
+012 (`totem_eventos`, ver "Estrutura do banco") — as duas **já rodadas**.
+
+**`/superadmin`** (sem slug, rota fica antes de `/:slug` no `App.jsx`) — só
+`papel === 'superadmin'`. Lista todos os estabelecimentos com
+Bloquear/Desbloquear (grava em `estabelecimentos.bloqueado`, sempre atrás de
+`window.confirm` — mexe direto no negócio do cliente) e as mesmas quatro
+estatísticas do `/admin`, uma linha por loja.
+
+**Estatísticas (pedidos/pagos/desistências/quedas) — peças compartilhadas
+entre `/admin` e `/superadmin`:**
+* `app/src/lib/useEstatisticas.js` — hook `useEstatisticasPedidos({ inicio,
+fim, estabelecimentoId })`. Sem `estabelecimentoId` agrupa por loja (uso do
+`/superadmin`); com `estabelecimentoId` filtra pra uma só (uso do `/admin`).
+Desistência = pedido não pago e criado há mais de 20 minutos (o QR do Pix
+expira em 15 min, ver `criarPagamentoPix`) — não existe status "desistiu" no
+banco, é inferido pela idade do pedido.
+* `app/src/componentes/SeletorPeriodo.jsx` — dois `<input type="date">`
+(De/Até) + funções `inicioDoDiaIso`/`fimDoDiaIso`/`dataDeHoje`/
+`dataDiasAtras`. Não tem borda própria (foi tirada de propósito pra cada
+tela decidir a moldura ao redor, já que agora é embutido em lugares
+diferentes) — quem usa envolve num `<div>` com a borda que quiser.
+* Datas do seletor usam o fuso de quem está OLHANDO a tela (Isaac ou o
+dono), não o fuso do estabelecimento — **REGRA 4 não se aplica aqui de
+propósito**: é ferramenta interna, o intervalo escolhido nunca aparece pro
+cliente final do totem.
+
+**Pedidos de teste do Adorável Burguer:** existia um lote de pedidos de
+teste (dos testes de Pix com dinheiro real) misturado com o que seria dado
+real do piloto. Script `zerar_pedidos_teste_adoravelburguer.sql` (não
+versionado, mesmo padrão do SQL avulso de credencial) apaga tudo de
+`pedidos` daquele estabelecimento — cascata automática limpa
+`pedido_itens`/`pedido_item_opcoes` junto (REGRA de FK `on delete cascade`).
+**Confirmar com o Isaac se já rodou**, antes de usar as estatísticas pra
+julgar o piloto de verdade.
 
 \---
 
