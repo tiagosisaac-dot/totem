@@ -446,14 +446,14 @@ dono), não o fuso do estabelecimento — **REGRA 4 não se aplica aqui de
 propósito**: é ferramenta interna, o intervalo escolhido nunca aparece pro
 cliente final do totem.
 
-**Pedidos de teste do Adorável Burguer:** existia um lote de pedidos de
-teste (dos testes de Pix com dinheiro real) misturado com o que seria dado
-real do piloto. Script `zerar_pedidos_teste_adoravelburguer.sql` (não
-versionado, mesmo padrão do SQL avulso de credencial) apaga tudo de
-`pedidos` daquele estabelecimento — cascata automática limpa
+**Pedidos de teste do Adorável Burguer: zerados (10/09/2026).** Existia um
+lote de pedidos de teste (dos testes de Pix com dinheiro real) misturado com
+o que seria dado real do piloto. Script `zerar_pedidos_teste_adoravelburguer.sql`
+(não versionado, mesmo padrão do SQL avulso de credencial) apagou tudo de
+`pedidos` daquele estabelecimento — cascata automática limpou
 `pedido_itens`/`pedido_item_opcoes` junto (REGRA de FK `on delete cascade`).
-**Confirmar com o Isaac se já rodou**, antes de usar as estatísticas pra
-julgar o piloto de verdade.
+A partir de agora, qualquer pedido no `/admin`/`/superadmin` do Adorável é
+dado real do piloto.
 
 \---
 
