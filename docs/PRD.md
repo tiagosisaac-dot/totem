@@ -125,16 +125,24 @@ Escopo fechado. O piloto precisa ir ao ar; nada fora desta lista entra agora.
 * **Data de início:** **A DEFINIR**
 * **Duração antes de decidir se vira produto:** **A DEFINIR**
 
-### Critério de sucesso — A DEFINIR
+### Critério de sucesso (decidido em 10/09/2026)
 
-Sem isso, no fim do piloto a avaliação vira sensação ("achei que foi bem").
-Sugestões de medida, escolher poucas:
+**Período do piloto: 4 a 6 semanas** de operação real (tablet ligado no dia a
+dia, não só teste). Três números objetivos, medidos direto no painel
+`/superadmin` (sem relatório novo — já é parte do painel central que existe
+pra outra coisa), mais uma pergunta direta ao dono no fim:
 
-* % dos pedidos que entraram pelo totem em vez do caixa
-* Pedidos abandonados no meio (cliente desistiu)
-* Erro de pedido comparado ao caixa
-* O dono conseguiu operar um pico com menos gente que antes?
-* O dono renovaria pagando?
+1. **Volume** — pedidos pelo totem por semana, estável ou crescendo (não
+   caindo depois que a novidade passa)
+2. **Desistências** — pedido criado no totem mas nunca pago (mais de 20 min
+   parado em "aguardando pagamento") — sinal de fricção em algum ponto do
+   fluxo
+3. **Confiabilidade** — quantas vezes o totem caiu durante o expediente
+   (histórico gravado em `totem_eventos`, migração 012)
+4. **A pergunta que decide de verdade, no fim do período:** o dono pagaria a
+   mensalidade pra continuar? Os três números acima são apoio pra essa
+   conversa não ser só "achei que foi bem" — mas quem decide se vira produto
+   é essa resposta.
 
 ---
 
