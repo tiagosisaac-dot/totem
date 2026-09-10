@@ -22,6 +22,17 @@ const COR_TEXTO = '#111111'
 const COR_FUNDO = '#F5F5F5'
 const MENSAGEM_PADRAO = 'Sistema temporariamente indisponível.'
 
+const PERIODOS = [
+  { chave: 'hoje', rotulo: 'Hoje', dias: 1 },
+  { chave: '7dias', rotulo: '7 dias', dias: 7 },
+  { chave: '30dias', rotulo: '30 dias', dias: 30 },
+]
+
+// Pedido criado ha mais que isso e ainda nao pago conta como
+// desistencia — o QR code do Pix expira em 15 min (ver criarPagamentoPix),
+// entao passado esse tempo nao e mais "ainda pagando", e abandono de verdade.
+const MINUTOS_ATE_CONTAR_DESISTENCIA = 20
+
 export default function Superadmin() {
   const { sessao, carregando: carregandoSessao } = useSessao()
   const [papel, setPapel] = useState(null)
@@ -29,6 +40,7 @@ export default function Superadmin() {
   const [lojas, setLojas] = useState([])
   const [carregandoLojas, setCarregandoLojas] = useState(true)
   const [estatisticas, setEstatisticas] = useState({})
+  const [periodo, setPeriodo] = useState('7dias')
   const [erro, setErro] = useState(null)
 
   useEffect(() => {
@@ -82,40 +94,59 @@ export default function Superadmin() {
     }
   }, [liberado])
 
-  // ---- pedidos dos ultimos 7 dias, por loja — pra medir o piloto ----
-  // (criterio de sucesso do docs/PRD.md: volume estavel/crescendo,
-  // abandono = total menos pagos)
+  // ---- pedidos + quedas do periodo escolhido, por loja — pra medir o
+  // piloto (criterio de sucesso do docs/PRD.md: volume estavel/crescendo,
+  // desistencia, confiabilidade) ----
   useEffect(() => {
     if (!liberado) return
     let cancelado = false
 
-    const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString()
+    const dias = PERIODOS.find((p) => p.chave === periodo)?.dias ?? 7
+    const inicio = new Date(Date.now() - dias * 24 * 60 * 60_000).toISOString()
+    const limiteDesistencia = new Date(Date.now() - MINUTOS_ATE_CONTAR_DESISTENCIA * 60_000).toISOString()
 
-    supabase
-      .from('pedidos')
-      .select('estabelecimento_id, pago')
-      .eq('origem', 'totem')
-      .gte('criado_em', seteDiasAtras)
-      .then(({ data, error }) => {
-        if (cancelado) return
-        if (error) {
-          console.error('Falha ao carregar estatísticas:', error)
-          return
+    Promise.all([
+      supabase
+        .from('pedidos')
+        .select('estabelecimento_id, pago, criado_em')
+        .eq('origem', 'totem')
+        .gte('criado_em', inicio),
+      supabase
+        .from('totem_eventos')
+        .select('estabelecimento_id')
+        .eq('tipo', 'queda')
+        .gte('criado_em', inicio),
+    ]).then(([respPedidos, respEventos]) => {
+      if (cancelado) return
+      if (respPedidos.error || respEventos.error) {
+        console.error('Falha ao carregar estatísticas:', respPedidos.error || respEventos.error)
+        return
+      }
+
+      const porLoja = {}
+      const dadoDaLoja = (id) =>
+        (porLoja[id] ??= { total: 0, pagos: 0, desistencias: 0, quedas: 0 })
+
+      for (const p of respPedidos.data) {
+        const linha = dadoDaLoja(p.estabelecimento_id)
+        linha.total += 1
+        if (p.pago) {
+          linha.pagos += 1
+        } else if (p.criado_em < limiteDesistencia) {
+          linha.desistencias += 1
         }
-        const porLoja = {}
-        for (const p of data) {
-          const atual = porLoja[p.estabelecimento_id] ?? { total: 0, pagos: 0 }
-          atual.total += 1
-          if (p.pago) atual.pagos += 1
-          porLoja[p.estabelecimento_id] = atual
-        }
-        setEstatisticas(porLoja)
-      })
+      }
+      for (const e of respEventos.data) {
+        dadoDaLoja(e.estabelecimento_id).quedas += 1
+      }
+
+      setEstatisticas(porLoja)
+    })
 
     return () => {
       cancelado = true
     }
-  }, [liberado])
+  }, [liberado, periodo])
 
   async function alternarBloqueio(loja) {
     const vaiBloquear = !loja.bloqueado
@@ -188,6 +219,23 @@ export default function Superadmin() {
         </p>
       )}
 
+      <div className="flex gap-2 border-b-2 px-5 py-3" style={{ borderColor: `${COR_TEXTO}22` }}>
+        {PERIODOS.map((p) => (
+          <button
+            key={p.chave}
+            onClick={() => setPeriodo(p.chave)}
+            className="min-h-[44px] rounded-lg px-4 text-lg font-bold active:scale-95"
+            style={
+              periodo === p.chave
+                ? { backgroundColor: COR_TEXTO, color: COR_FUNDO }
+                : { border: `2px solid ${COR_TEXTO}44` }
+            }
+          >
+            {p.rotulo}
+          </button>
+        ))}
+      </div>
+
       <main className="min-h-0 flex-1 overflow-y-auto p-5" style={{ overscrollBehavior: 'contain' }}>
         {carregandoLojas ? (
           <p className="mt-12 text-center text-3xl opacity-60">Carregando...</p>
@@ -207,17 +255,27 @@ export default function Superadmin() {
                 </div>
 
                 <div className="text-center">
-                  <p className="text-2xl font-black">
-                    {(estatisticas[loja.id]?.total ?? 0)}
-                  </p>
-                  <p className="text-sm opacity-60">pedidos (7 dias)</p>
+                  <p className="text-2xl font-black">{estatisticas[loja.id]?.total ?? 0}</p>
+                  <p className="text-sm opacity-60">pedidos</p>
                 </div>
 
                 <div className="text-center">
-                  <p className="text-2xl font-black">
-                    {(estatisticas[loja.id]?.pagos ?? 0)}
+                  <p className="text-2xl font-black">{estatisticas[loja.id]?.pagos ?? 0}</p>
+                  <p className="text-sm opacity-60">pagos</p>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-2xl font-black" style={{ color: estatisticas[loja.id]?.desistencias ? ALERTA : undefined }}>
+                    {estatisticas[loja.id]?.desistencias ?? 0}
                   </p>
-                  <p className="text-sm opacity-60">pagos (7 dias)</p>
+                  <p className="text-sm opacity-60">desistências</p>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-2xl font-black" style={{ color: estatisticas[loja.id]?.quedas ? ALERTA : undefined }}>
+                    {estatisticas[loja.id]?.quedas ?? 0}
+                  </p>
+                  <p className="text-sm opacity-60">quedas</p>
                 </div>
 
                 <span

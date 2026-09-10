@@ -48,6 +48,7 @@ Deno.serve(async () => {
       .from('totem_heartbeat')
       .update({ alertado_em: new Date().toISOString() })
       .eq('estabelecimento_id', linha.estabelecimento_id)
+    await sb.from('totem_eventos').insert({ estabelecimento_id: linha.estabelecimento_id, tipo: 'queda' })
   }
 
   return new Response(JSON.stringify({ ok: true, avisados: caidos?.length ?? 0 }), {

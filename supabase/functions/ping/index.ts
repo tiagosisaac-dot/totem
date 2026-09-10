@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
 
   if (anterior?.alertado_em) {
     await avisar(`✅ Totem de ${loja.nome} voltou a responder.`)
+    await sb.from('totem_eventos').insert({ estabelecimento_id: loja.id, tipo: 'recuperacao' })
   }
 
   return resposta({ ok: true })
