@@ -63,7 +63,16 @@ o cliente não paga desenvolvimento — paga assinatura.
 
 * **SaaS multi-tenant.** Um único deploy atende todos os clientes. Cada
   estabelecimento é um registro no banco, isolado por `estabelecimento_id`
-* **Receita:** mensalidade por estabelecimento — **A DEFINIR (valor)**
+* **Receita (decidido em 10/09/2026):** mensalidade de **R$ 197/mês** +
+  **R$ 500 de implantação** (cobrança única, cobre o tempo de cadastrar
+  cardápio, configurar Pix e treinar a equipe no onboarding — ver estudo de
+  precificação no histórico do projeto: mercado brasileiro de totem
+  "só software" cobra R$ 100-500/mês, Isaac não cobra comissão por pedido
+  como parte dos concorrentes cobra, preço de lançamento fica na parte de
+  baixo da faixa por ainda não ter caso de sucesso pra mostrar). Reavaliar
+  pra cima (R$ 250-350) depois de 2-3 clientes rodando bem.
+  **O Adorável Burguer (piloto) não paga** — é parceria: usa de graça em
+  troca de divulgação/referência do produto
 * **Cobrança e inadimplência:** o sistema tem o campo `bloqueado`. Estabelecimento
   bloqueado para de aceitar pedido e mostra mensagem neutra ao cliente final,
   não expõe que é falta de pagamento
@@ -252,7 +261,7 @@ estabelecimentos. Não são dívida técnica — são escolhas conscientes com p
 
 ## 14. Perguntas abertas
 
-1. Valor da mensalidade
+1. ~~Valor da mensalidade~~ — **decidido em 10/09/2026**, ver seção 5
 2. O tablet é do dono ou entra no pacote?
 3. Quantos tablets no piloto e onde ficam fisicamente
 4. Critério de sucesso do piloto
