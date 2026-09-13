@@ -483,6 +483,19 @@ qualquer loja, só faltava a tela. Storage também: `cardapio_superadmin`
 (em `supabase/storage_policies.sql`) já dava acesso total ao bucket
 inteiro pro superadmin.
 
+**Bug corrigido no mesmo dia (migração 013, ainda não rodada):** as
+policies da migração 005 exigiam `estabelecimento_id = meu_estabelecimento()
+AND sou_dono()` — `meu_estabelecimento()` devolve a loja do PRÓPRIO perfil
+de quem está logado, inclusive pro superadmin. Na prática, o Isaac só
+conseguia criar/editar cardápio na loja ligada ao perfil dele, nunca na de
+um cliente — apareceu testando "Nao foi possível criar o produto." na
+`teste-isolamento`. `migracao_013_superadmin_edita_cardapio_qualquer_loja.sql`
+troca a condição pra `sou_superadmin() or (estabelecimento_id =
+meu_estabelecimento() and meu_papel() = 'dono')` em produtos/categorias/
+grupos_opcoes/opcoes — dono continua só na própria loja, superadmin passa
+a poder em qualquer uma. **Isaac precisa rodar essa migração antes de usar
+a tela de cardápio de novo.**
+
 **Fase B (ainda não feita): combo e grupo de opção reutilizável** (tipo
 "Turbine seu burger", "Bebida do combo"). Falta: (1) migração nova dando
 `insert`/`update`/`delete` em `combo_slots` e `combo_slot_produtos` pra
