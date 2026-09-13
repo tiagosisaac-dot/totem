@@ -446,6 +446,52 @@ dono), não o fuso do estabelecimento — **REGRA 4 não se aplica aqui de
 propósito**: é ferramenta interna, o intervalo escolhido nunca aparece pro
 cliente final do totem.
 
+## Edição de cardápio pelo /superadmin — Fase A (12/09/2026)
+
+Antes disso, cardápio só era criado/editado por SQL avulso (Isaac cola no
+SQL Editor) e foto só subia arrastando no painel de Storage — processo que
+acabou de se mostrar frágil (bug do "(1)" duplicado, cache de CDN por 1h).
+Isaac pediu pra virar tudo tela, dentro do `/superadmin` (não no `/admin`
+do dono — cadastro de cardápio continua trabalho do Isaac, decisão de
+escopo já registrada acima).
+
+**Fase A (feita): categoria e produto, com foto.** Botão "Cardápio" em
+cada linha do `/superadmin` abre `CardapioSuperadmin.jsx` pra aquela loja:
+criar/editar/pausar/apagar categoria; criar/editar/esgotar/apagar produto
+(nome, descrição, preço, disponível, vendável sozinho, foto). Produto novo
+sempre nasce `tipo: 'simples'` — virar combo é Fase B.
+
+* `app/src/lib/fotoProduto.js` — **primeiro redimensionamento de imagem
+que existe dentro do próprio app** (REGRA 5 até aqui era sempre feita por
+fora, na mão). Usa `<canvas>` no navegador (maior lado ≤ 800px, WebP,
+tenta qualidade menor se passar de 150KB). Upload usa
+`supabase.storage.from('cardapio').upload(caminho, blob, { upsert: true })`
+— o `upsert: true` é o que faltava quando subimos foto à mão pelo painel
+do Supabase (sem isso ele cria `"nome (1).webp"` em vez de substituir).
+A URL salva em `imagem_url` sai com `?v=<timestamp>` no final —
+**resolve de raiz a pegadinha de cache de foto** (ver mais abaixo): toda
+troca de foto muda o endereço, então o navegador nunca serve a versão
+velha por engano.
+* `app/src/lib/useCardapioAdmin.js` — CRUD de categoria/produto pra
+qualquer `lojaId` (não vem de sessão/slug como o `/admin` do dono; vem de
+qual loja o Isaac escolheu no `/superadmin`). Mesmo padrão otimista do
+`Admin.jsx` (atualiza a tela, desfaz se o banco recusar).
+* **Nenhuma migração de RLS foi necessária**: a migração 005 criou
+`sou_dono()` como `meu_papel() in ('dono','superadmin')` — superadmin já
+podia escrever em `categorias`/`produtos`/`grupos_opcoes`/`opcoes` de
+qualquer loja, só faltava a tela. Storage também: `cardapio_superadmin`
+(em `supabase/storage_policies.sql`) já dava acesso total ao bucket
+inteiro pro superadmin.
+
+**Fase B (ainda não feita): combo e grupo de opção reutilizável** (tipo
+"Turbine seu burger", "Bebida do combo"). Falta: (1) migração nova dando
+`insert`/`update`/`delete` em `combo_slots` e `combo_slot_produtos` pra
+`sou_dono()` — hoje essas duas tabelas só têm policy de leitura pública,
+ninguém escreve nelas fora do SQL Editor; (2) UI bem mais complexa (slot
+com min/max, produto ligado por slot com preço de upgrade, grupo com
+`depende_da_opcao_id` pro mecanismo de "Transformar em combo"). Até lá,
+combo/grupo de opção continuam por SQL avulso, mesmo padrão de sempre.
+
 **Pedidos de teste do Adorável Burguer: zerados (10/09/2026).** Existia um
 lote de pedidos de teste (dos testes de Pix com dinheiro real) misturado com
 o que seria dado real do piloto. Script `zerar_pedidos_teste_adoravelburguer.sql`
@@ -625,6 +671,27 @@ o bloqueio" sem ser esse o caso — o problema é a sessão, não o código.
 **Regra geral: sempre testar cada papel (cliente anônimo, dono, cozinha,
 superadmin) numa aba SEM nenhuma sessão de outro papel** — aba anônima nova,
 ou deslogar explicitamente antes (tem botão "Sair" em toda tela interna).
+
+**Pegadinha de cache de foto — apareceu trocando as fotos das bebidas
+(12/09/2026).** Trocar o CONTEÚDO de uma foto que já existia (mesmo
+`produto_id.webp`, arquivo novo por cima do antigo no Storage) não aparece
+pro Isaac numa aba já aberta, nem com F5 forçado (Ctrl+Shift+R) — o
+Cache-Control do Storage é `public, max-age=3600`, o Chrome guarda a
+imagem por 1h e nem revalida nesse intervalo. **Confirmar sempre numa aba
+anônima nova primeiro** (nunca teve cache, mostra a versão real do
+servidor). Se for pra aba já aberta, precisa limpar especificamente
+"Imagens e arquivos em cache" (não history/cookies) da última hora em
+Configurações do Chrome — ou simplesmente esperar 1h. Isso não é bug de
+código nem do Storage, é cache normal de navegador — vai se repetir toda
+vez que uma foto de produto já existente for substituída.
+
+**Pegadinha de upload duplicado no Storage — mesmo dia.** Arrastar um
+arquivo pro Supabase Storage com o MESMO NOME de um que já existe não
+substitui: o painel cria uma cópia silenciosa com "(1)" (ou "(2)", "(3)"...)
+no nome, e o endereço original continua apontando pro arquivo velho. Depois
+de qualquer re-upload de foto já existente, **conferir se sobrou arquivo
+com "(N)" no nome** (Storage → busca pelo id do produto) — se sobrou,
+apagar o antigo E o "(N)", subir de novo numa pasta sem conflito de nome.
 
 \---
 

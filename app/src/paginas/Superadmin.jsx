@@ -18,6 +18,7 @@ import { useSessao, sair } from '../lib/sessao.js'
 import { useEstatisticasPedidos } from '../lib/useEstatisticas.js'
 import Login from '../componentes/Login.jsx'
 import SeletorPeriodo, { dataDeHoje, dataDiasAtras, inicioDoDiaIso, fimDoDiaIso } from '../componentes/SeletorPeriodo.jsx'
+import CardapioSuperadmin from '../componentes/CardapioSuperadmin.jsx'
 import { ALERTA, Recado } from '../componentes/PainelComuns.jsx'
 
 const COR_TEXTO = '#111111'
@@ -33,6 +34,7 @@ export default function Superadmin() {
   const [dataInicio, setDataInicio] = useState(() => dataDiasAtras(7))
   const [dataFim, setDataFim] = useState(() => dataDeHoje())
   const [erro, setErro] = useState(null)
+  const [lojaCardapio, setLojaCardapio] = useState(null)
 
   useEffect(() => {
     if (!sessao) {
@@ -141,6 +143,18 @@ export default function Superadmin() {
     )
   }
 
+  if (lojaCardapio) {
+    return (
+      <CardapioSuperadmin
+        lojaId={lojaCardapio.id}
+        lojaNome={lojaCardapio.nome}
+        aoFechar={() => setLojaCardapio(null)}
+        corTexto={COR_TEXTO}
+        corFundo={COR_FUNDO}
+      />
+    )
+  }
+
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: COR_FUNDO, color: COR_TEXTO }}>
       <header
@@ -228,6 +242,14 @@ export default function Superadmin() {
                     Desativado
                   </span>
                 )}
+
+                <button
+                  onClick={() => setLojaCardapio(loja)}
+                  className="min-h-[56px] rounded-xl border-4 px-6 text-xl font-black active:scale-95"
+                  style={{ borderColor: COR_TEXTO }}
+                >
+                  Cardápio
+                </button>
 
                 <button
                   onClick={() => alternarBloqueio(loja)}
